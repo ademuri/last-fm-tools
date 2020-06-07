@@ -1,14 +1,6 @@
 load("@bazel_tools//tools/build_defs/repo:git.bzl", "new_git_repository")
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
-new_git_repository(
-    name = "lastfm-go",
-    build_file="BUILD.lastfm-go",
-    remote = "https://github.com/shkh/lastfm-go.git",
-    branch = "master",
-)
-
-
 http_archive(
     name = "io_bazel_rules_go",
     sha256 = "a8d6b1b354d371a646d2f7927319974e0f9e52f73a2452d2b3877118169eb6bb",
@@ -23,3 +15,18 @@ load("@io_bazel_rules_go//go:deps.bzl", "go_rules_dependencies", "go_register_to
 go_rules_dependencies()
 
 go_register_toolchains()
+
+new_git_repository(
+    name = "lastfm-go",
+    build_file="BUILD.lastfm-go",
+    remote = "https://github.com/shkh/lastfm-go.git",
+    branch = "master",
+)
+
+new_git_repository(
+    name = "go-sqlite3",
+    build_file="BUILD.go-sqlite3",
+    remote = "https://github.com/mattn/go-sqlite3.git",
+    tag = "v1.10.0",
+)
+

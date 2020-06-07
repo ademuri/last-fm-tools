@@ -5,6 +5,10 @@ go_binary(
     srcs = ["tools.go"],
     deps = [
         "@lastfm-go//:lastfm-go",
+        "@go-sqlite3//:go-sqlite3",
         "@//secrets",
+    ],
+    data = [
+        "sql/create-tables.sql",
     ],
 )

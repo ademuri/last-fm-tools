@@ -1,0 +1,4 @@
+CREATE TABLE IF NOT EXISTS Artist (
+  mbid TEXT PRIMARY KEY,
+  name TEXT 
+)
