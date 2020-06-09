@@ -6,7 +6,7 @@ import (
 	"io/ioutil"
 	"strings"
 
-	"github.com/ademuri/last-fm-tools/secrets"
+	"github.com/ademuri/last-fm-tools/internal/secrets"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/shkh/lastfm-go/lastfm"
 )

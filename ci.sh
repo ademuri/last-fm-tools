@@ -2,5 +2,6 @@
 
 set -euo pipefail
 
-cp -n secrets/secrets.go.sample secrets/secrets.go
-bazel build :last-fm-tools
+cp -n internal/secrets/secrets.go.sample internal/secrets/secrets.go
+bazel build //...
+bazel test //...
