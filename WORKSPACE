@@ -25,22 +25,11 @@ go_rules_dependencies()
 
 go_register_toolchains()
 
-load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies")
+load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies", "go_repository")
 
 gazelle_dependencies()
 
-load("@bazel_gazelle//:deps.bzl", "go_repository")
+load("//:repositories.bzl", "go_repositories")
 
-# Download using "go mod download"
-go_repository(
-    name = "com_github_shkh_lastfm_go",
-    importpath = "github.com/shkh/lastfm-go",
-    commit = "89a801c244e0e5c320fcd4416e7a30520dc8a233",
-)
-
-# Download using "go mod download"
-go_repository(
-    name = "com_github_mattn_go_sqlite3",
-    importpath = "github.com/mattn/go-sqlite3",
-    tag = "v1.10.0",
-)
+# gazelle:repository_macro repositories.bzl%go_repositories
+go_repositories()
