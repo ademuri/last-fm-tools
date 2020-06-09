@@ -3,22 +3,17 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"io/ioutil"
 	"strings"
 
 	"github.com/ademuri/last-fm-tools/internal/secrets"
+	"github.com/ademuri/last-fm-tools/migration"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/shkh/lastfm-go/lastfm"
 )
 
 func main() {
 	user := strings.ToLower(secrets.LastFmUser)
-	database, err := sql.Open("sqlite3", "./my.db")
-	if err != nil {
-		fmt.Println("Error opening sqlite3 database", err)
-		return
-	}
-	err = createTables(database)
+	database, err := createDatabase()
 	if err != nil {
 		fmt.Println("Error creating database", err)
 		return
@@ -47,13 +42,23 @@ func main() {
 	}
 }
 
-func createTables(db *sql.DB) (err error) {
-	data, err := ioutil.ReadFile("sql/create-tables.sql")
+func createDatabase() (*sql.DB, error) {
+	database, err := sql.Open("sqlite3", "./my.db")
 	if err != nil {
-		return err
+		fmt.Println("Error opening sqlite3 database", err)
+		return nil, err
+	}
+	err = createTables(database)
+	if err != nil {
+		fmt.Println("Error creating database", err)
+		return nil, err
 	}
 
-	_, err = db.Exec(string(data))
+	return database, nil
+}
+
+func createTables(db *sql.DB) error {
+	_, err := db.Exec(migration.Create)
 	return err
 }
 
