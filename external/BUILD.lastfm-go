@@ -1,8 +1,0 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
-
-go_library(
-  name = "lastfm-go",
-  importpath = "github.com/shkh/lastfm-go/lastfm",
-  srcs = glob(["lastfm/*.go"]),
-  visibility = ["//visibility:public"],
-)

@@ -4,7 +4,13 @@ go_library(
     name = "secrets",
     srcs = ["secrets.go"],
     importpath = "secrets",
-    deps = [],
     visibility = ["//visibility:public"],
+    deps = [],
 )
 
+go_library(
+    name = "go_default_library",
+    srcs = ["secrets.go"],
+    importpath = "github.com/ademuri/last-fm-tools/secrets",
+    visibility = ["//visibility:public"],
+)
