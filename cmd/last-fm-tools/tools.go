@@ -19,8 +19,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/ademuri/last-fm-tools/internal/migration"
 	"github.com/ademuri/last-fm-tools/internal/secrets"
-	"github.com/ademuri/last-fm-tools/migration"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/shkh/lastfm-go/lastfm"
 )

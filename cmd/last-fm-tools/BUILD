@@ -6,8 +6,8 @@ go_library(
     importpath = "github.com/ademuri/last-fm-tools/cmd/last-fm-tools",
     visibility = ["//visibility:private"],
     deps = [
+        "//internal/migration:go_default_library",
         "//internal/secrets:go_default_library",
-        "//migration:go_default_library",
         "@com_github_mattn_go_sqlite3//:go_default_library",
         "@com_github_shkh_lastfm_go//lastfm:go_default_library",
     ],

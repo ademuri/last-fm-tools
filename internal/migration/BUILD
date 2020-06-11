@@ -15,6 +15,6 @@ go_library(
         "doc.go",
         "sql",  #keep
     ],
-    importpath = "github.com/ademuri/last-fm-tools/migration",
+    importpath = "github.com/ademuri/last-fm-tools/internal/migration",
     visibility = ["//visibility:public"],
 )
