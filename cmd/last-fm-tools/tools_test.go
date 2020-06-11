@@ -16,15 +16,67 @@ package main
 
 import "testing"
 
-func TestCreateUser(t *testing.T) {
+const (
+	user = "testuser"
+)
+
+func TestCreateDatabaseAndData(t *testing.T) {
 	db, err := createDatabase()
 	if err != nil {
-		t.Fatalf("createDatabase() error: %v", err)
+		t.Fatalf("createDatabase() error: %w", err)
 	}
 
-	user := "testuser"
 	err = createUser(db, user)
 	if err != nil {
-		t.Fatalf("createUser(%q) error: %v", user, err)
+		t.Fatalf("createUser(%q) error: %w", user, err)
+	}
+
+	err = createUser(db, user)
+	if err != nil {
+		t.Fatalf("createUser(%q) error: %w", user, err)
+	}
+
+	artist := "The Beatles"
+	err = createArtist(db, artist)
+	if err != nil {
+		t.Fatalf("createArtist(%q) error: %w", artist, err)
+	}
+
+	err = createArtist(db, artist)
+	if err != nil {
+		t.Fatalf("createArtist(%q) error: %w", artist, err)
+	}
+
+	album := "White Album"
+	err = createAlbum(db, artist, album)
+	if err != nil {
+		t.Fatalf("createAlbum(%q, %q) error: %w", artist, album, err)
+	}
+
+	err = createAlbum(db, artist, album)
+	if err != nil {
+		t.Fatalf("createAlbum(%q, %q) error: %w", artist, album, err)
+	}
+
+	track := "Ob-La-Di, Ob-La-Da"
+	track_id, err := createTrack(db, artist, album, track)
+	if err != nil {
+		t.Fatalf("createTrack(%q, %q, %q) error: %w", artist, album, track, err)
+	}
+
+	_, err = createTrack(db, artist, album, track)
+	if err != nil {
+		t.Fatalf("createTrack(%q, %q, %q) error: %w", artist, album, track, err)
+	}
+
+	datetime := "1"
+	err = createListen(db, track_id, datetime)
+	if err != nil {
+		t.Fatalf("createListen(%q, %q) error: %w", track_id, datetime, err)
+	}
+
+	err = createListen(db, track_id, datetime)
+	if err != nil {
+		t.Fatalf("createListen(%q, %q) error: %w", track_id, datetime, err)
 	}
 }
