@@ -49,8 +49,8 @@ def go_repositories():
     go_repository(
         name = "org_golang_x_sys",
         importpath = "golang.org/x/sys",
-        sum = "h1:OjiUf46hAmXblsZdnoSXsEUSKU8r1UEzcL5RVZ4gO9Y=",
-        version = "v0.0.0-20200602225109-6fdc65e7d980",
+        sum = "h1:bGb80FudwxpeucJUjPYJXuJ8Hk91vNtfvrymzwiei38=",
+        version = "v0.0.0-20200610111108-226ff32320da",
     )
     go_repository(
         name = "org_golang_x_text",
