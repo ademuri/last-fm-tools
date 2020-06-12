@@ -26,6 +26,7 @@ import (
 )
 
 var cfgFile string
+var lastFmUser string
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -49,11 +50,9 @@ func Execute() {
 func init() {
 	cobra.OnInitialize(initConfig)
 
-	// Here you will define your flags and configuration settings.
-	// Cobra supports persistent flags, which, if defined here,
-	// will be global for your application.
-
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.last-fm-tools.yaml)")
+	rootCmd.PersistentFlags().StringVarP(&lastFmUser, "user", "u", "", "last.fm username to act on")
+	rootCmd.MarkPersistentFlagRequired("user")
 }
 
 // initConfig reads in config file and ENV variables if set.

@@ -53,7 +53,7 @@ func init() {
 }
 
 func updateDatabase() {
-	user := strings.ToLower(secrets.LastFmUser)
+	user := strings.ToLower(lastFmUser)
 	database, err := createDatabase()
 	if err != nil {
 		fmt.Println("Error creating database", err)
