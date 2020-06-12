@@ -16,6 +16,7 @@ go_library(
         "@com_github_shkh_lastfm_go//lastfm:go_default_library",
         "@com_github_spf13_cobra//:go_default_library",
         "@com_github_spf13_viper//:go_default_library",
+        "@org_golang_x_time//rate:go_default_library",
     ],
 )
 

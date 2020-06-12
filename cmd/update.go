@@ -16,13 +16,16 @@ limitations under the License.
 package cmd
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/time/rate"
 
 	"github.com/ademuri/last-fm-tools/internal/migration"
 	"github.com/ademuri/last-fm-tools/internal/secrets"
@@ -70,7 +73,6 @@ func updateDatabase() error {
 			return fmt.Errorf("--after: %w", err)
 		}
 	}
-	_ = after
 
 	user := strings.ToLower(lastFmUser)
 	database, err := createDatabase()
@@ -85,17 +87,42 @@ func updateDatabase() error {
 		return fmt.Errorf("updateDatabase: %w", err)
 	}
 
-	recent_tracks, err := lastfm_client.User.GetRecentTracks(lastfm.P{
-		"user": user,
-	})
-	if err != nil {
-		return fmt.Errorf("updateDatabase: %w", err)
-	}
+	limiter := rate.NewLimiter(rate.Every(1*time.Second), 1)
+	page := 1 // First page is 1
+	pages := 0
+	for {
+		recent_tracks, err := lastfm_client.User.GetRecentTracks(lastfm.P{
+			"limit": 200,
+			"page":  page,
+			"user":  user,
+		})
+		if pages == 0 {
+			pages = recent_tracks.TotalPages
+		}
 
-	fmt.Println("Got", recent_tracks.Total, "tracks")
-	err = insertRecentTracks(database, recent_tracks)
-	if err != nil {
-		return fmt.Errorf("updateDatabase: %w", err)
+		if err != nil {
+			return fmt.Errorf("updateDatabase: %w", err)
+		}
+		err = insertRecentTracks(database, recent_tracks)
+		if err != nil {
+			return fmt.Errorf("updateDatabase: %w", err)
+		}
+		fmt.Printf("Downloaded page %v of %v\n", page, pages)
+		page += 1
+
+		oldestDateUts, err := strconv.ParseInt(recent_tracks.Tracks[len(recent_tracks.Tracks)-1].Date.Uts, 10, 64)
+		if err != nil {
+			return fmt.Errorf("updateDatabase: %w", err)
+		}
+		oldestDate := time.Unix(oldestDateUts, 0)
+		if !after.IsZero() && oldestDate.Before(after) {
+			break
+		}
+		if page >= pages {
+			break
+		}
+
+		limiter.Wait(context.Background())
 	}
 
 	return nil
