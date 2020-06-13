@@ -31,7 +31,7 @@ CREATE TABLE Track (
   FOREIGN KEY (artist) REFERENCES Artist(name),
   FOREIGN KEY (album) REFERENCES Album(name)
 );
-CREATE INDEX idx_track_by_metadata ON Track (artist, album, name);
+CREATE INDEX idx_track_by_metadata ON Track (artist, album);
 
 CREATE TABLE User (
   name TEXT PRIMARY KEY,
@@ -46,5 +46,4 @@ CREATE TABLE Listen (
   FOREIGN KEY (track) REFERENCES Track(id),
   FOREIGN KEY (user) REFERENCES User(name)
 );
-CREATE INDEX idx_listen_date ON Listen (user, date);
-CREATE INDEX idx_listen_exact ON Listen (user, track, date);
+CREATE INDEX idx_listen_exact ON Listen (user, date, track);

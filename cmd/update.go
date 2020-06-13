@@ -263,7 +263,7 @@ func createTrack(db *sql.DB, artist string, album string, name string) (id int64
 }
 
 func createListen(db *sql.DB, user string, track_id int64, datetime string) (err error) {
-	listen_exists, err := db.Query("SELECT id FROM Listen WHERE user = ? AND track = ? AND date = ?", user, track_id, datetime)
+	listen_exists, err := db.Query("SELECT id FROM Listen WHERE user = ? AND date = ? AND track = ?", user, datetime, track_id)
 	if err != nil {
 		return fmt.Errorf("createListen(%q, %q, %q): %w", user, track_id, datetime, err)
 	}
