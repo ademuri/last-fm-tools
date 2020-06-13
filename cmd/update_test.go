@@ -42,47 +42,58 @@ func TestCreateDatabaseAndData(t *testing.T) {
 		t.Fatalf("createUser(%q) error: %w", user, err)
 	}
 
+	tx, err := db.Begin()
+	if err != nil {
+		t.Fatalf("creating transaction: %w", err)
+	}
+
 	artist := "The Beatles"
-	err = createArtist(db, artist)
+
+	err = createArtist(tx, artist)
 	if err != nil {
 		t.Fatalf("createArtist(%q) error: %w", artist, err)
 	}
 
-	err = createArtist(db, artist)
+	err = createArtist(tx, artist)
 	if err != nil {
 		t.Fatalf("createArtist(%q) error: %w", artist, err)
 	}
 
 	album := "White Album"
-	err = createAlbum(db, artist, album)
+	err = createAlbum(tx, artist, album)
 	if err != nil {
 		t.Fatalf("createAlbum(%q, %q) error: %w", artist, album, err)
 	}
 
-	err = createAlbum(db, artist, album)
+	err = createAlbum(tx, artist, album)
 	if err != nil {
 		t.Fatalf("createAlbum(%q, %q) error: %w", artist, album, err)
 	}
 
 	track := "Ob-La-Di, Ob-La-Da"
-	track_id, err := createTrack(db, artist, album, track)
+	track_id, err := createTrack(tx, artist, album, track)
 	if err != nil {
 		t.Fatalf("createTrack(%q, %q, %q) error: %w", artist, album, track, err)
 	}
 
-	_, err = createTrack(db, artist, album, track)
+	_, err = createTrack(tx, artist, album, track)
 	if err != nil {
 		t.Fatalf("createTrack(%q, %q, %q) error: %w", artist, album, track, err)
 	}
 
 	datetime := "1"
-	err = createListen(db, user, track_id, datetime)
+	err = createListen(tx, user, track_id, datetime)
 	if err != nil {
 		t.Fatalf("createListen(%q, %q) error: %w", track_id, datetime, err)
 	}
 
-	err = createListen(db, user, track_id, datetime)
+	err = createListen(tx, user, track_id, datetime)
 	if err != nil {
 		t.Fatalf("createListen(%q, %q) error: %w", track_id, datetime, err)
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		t.Fatalf("commiting transaction: %w", err)
 	}
 }

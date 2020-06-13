@@ -197,18 +197,23 @@ func createUser(db *sql.DB, user string) error {
 }
 
 func insertRecentTracks(db *sql.DB, user string, recent_tracks lastfm.UserGetRecentTracks) (err error) {
+	tx, err := db.Begin()
+	if err != nil {
+		fmt.Errorf("Creating transaction for insertRecentTracks: %w", err)
+	}
+
 	for _, track := range recent_tracks.Tracks {
-		err := createArtist(db, track.Artist.Name)
+		err = createArtist(tx, track.Artist.Name)
 		if err != nil {
 			return fmt.Errorf("insertRecentTracks(page=%v): %w", recent_tracks.Page, err)
 		}
 
-		err = createAlbum(db, track.Artist.Name, track.Album.Name)
+		err = createAlbum(tx, track.Artist.Name, track.Album.Name)
 		if err != nil {
 			return fmt.Errorf("insertRecentTracks(page=%v): %w", recent_tracks.Page, err)
 		}
 
-		track_id, err := createTrack(db, track.Artist.Name, track.Album.Name, track.Name)
+		track_id, err := createTrack(tx, track.Artist.Name, track.Album.Name, track.Name)
 		if err != nil {
 			return fmt.Errorf("insertRecentTracks(page=%v): %w", recent_tracks.Page, err)
 		}
@@ -216,16 +221,21 @@ func insertRecentTracks(db *sql.DB, user string, recent_tracks lastfm.UserGetRec
 			return fmt.Errorf("createTrack(%q, %q, %q) returned 0", track.Artist.Name, track.Album.Name, track.Name)
 		}
 
-		err = createListen(db, user, track_id, track.Date.Uts)
+		err = createListen(tx, user, track_id, track.Date.Uts)
 		if err != nil {
 			return fmt.Errorf("insertRecentTracks(page=%v): %w", recent_tracks.Page, err)
 		}
 	}
 
+	err = tx.Commit()
+	if err != nil {
+		return fmt.Errorf("Comming transaction in insertRecentTracks: %w", err)
+	}
+
 	return nil
 }
 
-func createArtist(db *sql.DB, name string) (err error) {
+func createArtist(db *sql.Tx, name string) (err error) {
 	artist_exists, err := db.Query("SELECT name FROM Artist WHERE name = ?", name)
 	if err != nil {
 		return fmt.Errorf("createArtist(%q): %w", name, err)
@@ -242,7 +252,7 @@ func createArtist(db *sql.DB, name string) (err error) {
 	return nil
 }
 
-func createAlbum(db *sql.DB, artist string, name string) (err error) {
+func createAlbum(db *sql.Tx, artist string, name string) (err error) {
 	album_exists, err := db.Query("SELECT name FROM Album WHERE artist = ? AND name = ?", artist, name)
 	if err != nil {
 		return fmt.Errorf("createAlbum(%q, %q): %w", artist, name, err)
@@ -259,7 +269,7 @@ func createAlbum(db *sql.DB, artist string, name string) (err error) {
 	return nil
 }
 
-func createTrack(db *sql.DB, artist string, album string, name string) (id int64, err error) {
+func createTrack(db *sql.Tx, artist string, album string, name string) (id int64, err error) {
 	track_exists, err := db.Query("SELECT id FROM Track WHERE artist = ? AND album = ? AND name = ?", artist, album, name)
 	if err != nil {
 		return 0, fmt.Errorf("createTrack(%q, %q, %q): %w", artist, album, name, err)
@@ -285,7 +295,7 @@ func createTrack(db *sql.DB, artist string, album string, name string) (id int64
 	return track_id, nil
 }
 
-func createListen(db *sql.DB, user string, track_id int64, datetime string) (err error) {
+func createListen(db *sql.Tx, user string, track_id int64, datetime string) (err error) {
 	listen_exists, err := db.Query("SELECT id FROM Listen WHERE user = ? AND date = ? AND track = ?", user, datetime, track_id)
 	if err != nil {
 		return fmt.Errorf("createListen(%q, %q, %q): %w", user, track_id, datetime, err)
