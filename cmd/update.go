@@ -30,7 +30,6 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/ademuri/last-fm-tools/internal/migration"
-	"github.com/ademuri/last-fm-tools/internal/secrets"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/shkh/lastfm-go/lastfm"
 )
@@ -75,7 +74,7 @@ func updateDatabase(force bool) error {
 		return fmt.Errorf("updateDatabase: %w", err)
 	}
 
-	lastfm_client := lastfm.New(secrets.LastFmApiKey, secrets.LastFmSecret)
+	lastfm_client := lastfm.New(lastFmApiKey, lastFmSecret)
 
 	err = createUser(database, user)
 	if err != nil {

@@ -13,7 +13,6 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//internal/migration:go_default_library",
-        "//internal/secrets:go_default_library",
         "@com_github_avast_retry_go//:go_default_library",
         "@com_github_mattn_go_sqlite3//:go_default_library",
         "@com_github_mitchellh_go_homedir//:go_default_library",

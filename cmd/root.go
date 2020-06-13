@@ -28,6 +28,8 @@ import (
 )
 
 var cfgFile string
+var lastFmApiKey string
+var lastFmSecret string
 var lastFmUser string
 var databasePath string
 
@@ -53,13 +55,26 @@ func Execute() {
 func init() {
 	cobra.OnInitialize(initConfig)
 
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.last-fm-tools.yaml)")
+	rootCmd.PersistentFlags().StringVar(
+		&cfgFile, "config", "", "config file (default is $HOME/.last-fm-tools.yaml)")
 
-	rootCmd.PersistentFlags().StringVarP(&lastFmUser, "user", "u", "", "last.fm username to act on")
+	rootCmd.PersistentFlags().StringVarP(
+		&lastFmApiKey, "api_key", "", "", "last.fm API key")
+	rootCmd.MarkPersistentFlagRequired("api_key")
+	viper.BindPFlag("api_key", rootCmd.PersistentFlags().Lookup("api_key"))
+
+	rootCmd.PersistentFlags().StringVarP(
+		&lastFmSecret, "secret", "", "", "last.fm secret")
+	rootCmd.MarkPersistentFlagRequired("secret")
+	viper.BindPFlag("secret", rootCmd.PersistentFlags().Lookup("secret"))
+
+	rootCmd.PersistentFlags().StringVarP(
+		&lastFmUser, "user", "u", "", "last.fm username to act on")
 	rootCmd.MarkPersistentFlagRequired("user")
 	viper.BindPFlag("user", rootCmd.PersistentFlags().Lookup("user"))
 
-	rootCmd.PersistentFlags().StringVarP(&databasePath, "database", "d", "./lastfm.db", "Path to the SQLite database")
+	rootCmd.PersistentFlags().StringVarP(
+		&databasePath, "database", "d", "./lastfm.db", "Path to the SQLite database")
 	viper.BindPFlag("database", rootCmd.PersistentFlags().Lookup("database"))
 }
 
