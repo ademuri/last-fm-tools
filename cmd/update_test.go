@@ -27,7 +27,11 @@ func TestCreateDatabaseAndData(t *testing.T) {
 	if err != nil {
 		t.Fatalf("createDatabase() error: %w", err)
 	}
+	if db == nil {
+		t.Fatalf("createDatabase() returned nil")
+	}
 
+	user := "testuser"
 	err = createUser(db, user)
 	if err != nil {
 		t.Fatalf("createUser(%q) error: %w", user, err)
@@ -72,12 +76,12 @@ func TestCreateDatabaseAndData(t *testing.T) {
 	}
 
 	datetime := "1"
-	err = createListen(db, track_id, datetime)
+	err = createListen(db, user, track_id, datetime)
 	if err != nil {
 		t.Fatalf("createListen(%q, %q) error: %w", track_id, datetime, err)
 	}
 
-	err = createListen(db, track_id, datetime)
+	err = createListen(db, user, track_id, datetime)
 	if err != nil {
 		t.Fatalf("createListen(%q, %q) error: %w", track_id, datetime, err)
 	}

@@ -103,7 +103,7 @@ func updateDatabase() error {
 		if err != nil {
 			return fmt.Errorf("updateDatabase: %w", err)
 		}
-		err = insertRecentTracks(database, recent_tracks)
+		err = insertRecentTracks(database, user, recent_tracks)
 		if err != nil {
 			return fmt.Errorf("updateDatabase: %w", err)
 		}
@@ -142,16 +142,26 @@ func createDatabase() (*sql.DB, error) {
 }
 
 func createTables(db *sql.DB) error {
-	_, err := db.Exec(migration.Create)
-	return err
+	exists, err := db.Query("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'User'")
+	if err != nil {
+		return fmt.Errorf("createTables: %w", err)
+	}
+	defer exists.Close()
+
+	if !exists.Next() {
+		_, err = db.Exec(migration.Create)
+		return err
+	}
+
+	return nil
 }
 
-func createUser(db *sql.DB, user string) (err error) {
-	user_rows, err := db.Query("SELECT id FROM User WHERE name = ?", user)
-	defer user_rows.Close()
+func createUser(db *sql.DB, user string) error {
+	user_rows, err := db.Query("SELECT name FROM User WHERE name = ?", user)
 	if err != nil {
 		return fmt.Errorf("createUser(%q): %w", user, err)
 	}
+	defer user_rows.Close()
 
 	if !user_rows.Next() {
 		_, err := db.Exec("INSERT INTO User (name) VALUES (?)", user)
@@ -162,7 +172,7 @@ func createUser(db *sql.DB, user string) (err error) {
 	return nil
 }
 
-func insertRecentTracks(db *sql.DB, recent_tracks lastfm.UserGetRecentTracks) (err error) {
+func insertRecentTracks(db *sql.DB, user string, recent_tracks lastfm.UserGetRecentTracks) (err error) {
 	for _, track := range recent_tracks.Tracks {
 		err := createArtist(db, track.Artist.Name)
 		if err != nil {
@@ -179,7 +189,7 @@ func insertRecentTracks(db *sql.DB, recent_tracks lastfm.UserGetRecentTracks) (e
 			return fmt.Errorf("insertRecentTracks(page=%v): %w", recent_tracks.Page, err)
 		}
 
-		err = createListen(db, track_id, track.Date.Uts)
+		err = createListen(db, user, track_id, track.Date.Uts)
 		if err != nil {
 			return fmt.Errorf("insertRecentTracks(page=%v): %w", recent_tracks.Page, err)
 		}
@@ -190,10 +200,10 @@ func insertRecentTracks(db *sql.DB, recent_tracks lastfm.UserGetRecentTracks) (e
 
 func createArtist(db *sql.DB, name string) (err error) {
 	artist_exists, err := db.Query("SELECT name FROM Artist WHERE name = ?", name)
-	defer artist_exists.Close()
 	if err != nil {
 		return fmt.Errorf("createArtist(%q): %w", name, err)
 	}
+	defer artist_exists.Close()
 
 	if !artist_exists.Next() {
 		_, err := db.Exec("INSERT INTO Artist (name) VALUES (?)", name)
@@ -206,14 +216,14 @@ func createArtist(db *sql.DB, name string) (err error) {
 }
 
 func createAlbum(db *sql.DB, artist string, name string) (err error) {
-	album_exists, err := db.Query("SELECT name FROM Album WHERE name = ? AND artist = ?", name, artist)
-	defer album_exists.Close()
+	album_exists, err := db.Query("SELECT name FROM Album WHERE artist = ? AND name = ?", artist, name)
 	if err != nil {
 		return fmt.Errorf("createAlbum(%q, %q): %w", artist, name, err)
 	}
+	defer album_exists.Close()
 
 	if !album_exists.Next() {
-		_, err := db.Exec("INSERT INTO Album (name, artist) VALUES (?, ?)", name, artist)
+		_, err := db.Exec("INSERT INTO Album (artist, name) VALUES (?, ?)", artist, name)
 		if err != nil {
 			return fmt.Errorf("createAlbum(%q, %q): %w", artist, name, err)
 		}
@@ -223,11 +233,11 @@ func createAlbum(db *sql.DB, artist string, name string) (err error) {
 }
 
 func createTrack(db *sql.DB, artist string, album string, name string) (id int64, err error) {
-	track_exists, err := db.Query("SELECT id FROM Track WHERE name = ? AND artist = ? AND album = ?", name, artist, album)
-	defer track_exists.Close()
+	track_exists, err := db.Query("SELECT id FROM Track WHERE artist = ? AND album = ? AND name = ?", artist, album, name)
 	if err != nil {
 		return 0, fmt.Errorf("createTrack(%q, %q, %q): %w", artist, album, name, err)
 	}
+	defer track_exists.Close()
 
 	if track_exists.Next() {
 		var id int64
@@ -235,7 +245,7 @@ func createTrack(db *sql.DB, artist string, album string, name string) (id int64
 		return id, nil
 	}
 
-	result, err := db.Exec("INSERT INTO Track (name, artist, album) VALUES (?, ?, ?)", name, artist, album)
+	result, err := db.Exec("INSERT INTO Track (artist, album, name) VALUES (?, ?, ?)", artist, album, name)
 	if err != nil {
 		return 0, fmt.Errorf("createTrack(%q, %q, %q): %w", artist, album, name, err)
 	}
@@ -248,20 +258,20 @@ func createTrack(db *sql.DB, artist string, album string, name string) (id int64
 	return track_id, nil
 }
 
-func createListen(db *sql.DB, track_id int64, datetime string) (err error) {
-	listen_exists, err := db.Query("SELECT id FROM Listen WHERE track = ? AND date = ?", track_id, datetime)
-	defer listen_exists.Close()
+func createListen(db *sql.DB, user string, track_id int64, datetime string) (err error) {
+	listen_exists, err := db.Query("SELECT id FROM Listen WHERE user = ? AND track = ? AND date = ?", user, track_id, datetime)
 	if err != nil {
-		return fmt.Errorf("createListen(%q, %q): %w", track_id, datetime, err)
+		return fmt.Errorf("createListen(%q, %q, %q): %w", user, track_id, datetime, err)
 	}
+	defer listen_exists.Close()
 
 	if listen_exists.Next() {
 		return nil
 	}
 
-	_, err = db.Exec("INSERT INTO Listen (track, date) VALUES (?, ?)", track_id, datetime)
+	_, err = db.Exec("INSERT INTO Listen (user, track, date) VALUES (?, ?, ?)", user, track_id, datetime)
 	if err != nil {
-		return fmt.Errorf("createListen(%q, %q): %w", track_id, datetime, err)
+		return fmt.Errorf("createListen(%q, %q, %q): %w", user, track_id, datetime, err)
 	}
 	return nil
 }
