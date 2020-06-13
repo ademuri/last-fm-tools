@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"golang.org/x/time/rate"
 
 	"github.com/ademuri/last-fm-tools/internal/migration"
@@ -74,7 +75,7 @@ func updateDatabase() error {
 		}
 	}
 
-	user := strings.ToLower(lastFmUser)
+	user := strings.ToLower(viper.GetString("user"))
 	database, err := createDatabase()
 	if err != nil {
 		return fmt.Errorf("updateDatabase: %w", err)
@@ -87,6 +88,7 @@ func updateDatabase() error {
 		return fmt.Errorf("updateDatabase: %w", err)
 	}
 
+	fmt.Printf("Updating database for %q\n", user)
 	limiter := rate.NewLimiter(rate.Every(1*time.Second), 1)
 	page := 1 // First page is 1
 	pages := 0
@@ -142,13 +144,12 @@ func createDatabase() (*sql.DB, error) {
 }
 
 func createTables(db *sql.DB) error {
-	exists, err := db.Query("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'User'")
+	exists, err := dbExists(db)
 	if err != nil {
 		return fmt.Errorf("createTables: %w", err)
 	}
-	defer exists.Close()
 
-	if !exists.Next() {
+	if !exists {
 		_, err = db.Exec(migration.Create)
 		return err
 	}

@@ -16,10 +16,12 @@ limitations under the License.
 package cmd
 
 import (
+	"database/sql"
 	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/viper"
@@ -55,8 +57,10 @@ func init() {
 
 	rootCmd.PersistentFlags().StringVarP(&lastFmUser, "user", "u", "", "last.fm username to act on")
 	rootCmd.MarkPersistentFlagRequired("user")
+	viper.BindPFlag("user", rootCmd.PersistentFlags().Lookup("user"))
 
 	rootCmd.PersistentFlags().StringVarP(&databasePath, "database", "d", "./lastfm.db", "Path to the SQLite database")
+	viper.BindPFlag("database", rootCmd.PersistentFlags().Lookup("database"))
 }
 
 // initConfig reads in config file and ENV variables if set.
@@ -77,10 +81,35 @@ func initConfig() {
 		viper.SetConfigName(".last-fm-tools")
 	}
 
-	viper.AutomaticEnv() // read in environment variables that match
+	// viper.AutomaticEnv() // read in environment variables that match
 
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Println("Using config file:", viper.ConfigFileUsed())
 	}
+
+	// See https://github.com/spf13/viper/pull/852
+	rootCmd.Flags().VisitAll(func(f *pflag.Flag) {
+		if viper.IsSet(f.Name) && viper.GetString(f.Name) != "" {
+			rootCmd.Flags().Set(f.Name, viper.GetString(f.Name))
+		}
+	})
+}
+
+func openDb(dbPath string) (*sql.DB, error) {
+	db, err := sql.Open("sqlite3", dbPath)
+	if err != nil {
+		return nil, fmt.Errorf("openDb: %w", err)
+	}
+	return db, nil
+}
+
+func dbExists(db *sql.DB) (bool, error) {
+	exists, err := db.Query("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'User'")
+	if err != nil {
+		return false, fmt.Errorf("createTables: %w", err)
+	}
+	defer exists.Close()
+
+	return exists.Next(), nil
 }

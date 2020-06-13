@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "root.go",
+        "topAlbums.go",
         "update.go",
     ],
     importpath = "github.com/ademuri/last-fm-tools/cmd",
@@ -15,6 +16,7 @@ go_library(
         "@com_github_mitchellh_go_homedir//:go_default_library",
         "@com_github_shkh_lastfm_go//lastfm:go_default_library",
         "@com_github_spf13_cobra//:go_default_library",
+        "@com_github_spf13_pflag//:go_default_library",
         "@com_github_spf13_viper//:go_default_library",
         "@org_golang_x_time//rate:go_default_library",
     ],
@@ -22,6 +24,9 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["update_test.go"],
+    srcs = [
+        "topAlbums_test.go",
+        "update_test.go",
+    ],
     embed = [":go_default_library"],
 )
