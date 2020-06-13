@@ -24,6 +24,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/avast/retry-go"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"golang.org/x/time/rate"
@@ -93,18 +94,37 @@ func updateDatabase() error {
 	page := 1 // First page is 1
 	pages := 0
 	for {
-		recent_tracks, err := lastfm_client.User.GetRecentTracks(lastfm.P{
-			"limit": 200,
-			"page":  page,
-			"user":  user,
-		})
+		var recent_tracks lastfm.UserGetRecentTracks
+		err := retry.Do(
+			func() error {
+				var err error
+				recent_tracks, err = lastfm_client.User.GetRecentTracks(lastfm.P{
+					"limit": 200,
+					"page":  page,
+					"user":  user,
+				})
+				return err
+			},
+			retry.RetryIf(func(err error) bool {
+				if lerr, ok := err.(*lastfm.LastfmError); ok {
+					if lerr.Code/100 == 5 {
+						fmt.Printf("last.fm errored, retrying: %w", lerr)
+						return true
+					}
+					return false
+				} else {
+					return false
+				}
+			}),
+		)
+		if err != nil {
+			return fmt.Errorf("updateDatabase: %w", err)
+		}
+
 		if pages == 0 {
 			pages = recent_tracks.TotalPages
 		}
 
-		if err != nil {
-			return fmt.Errorf("updateDatabase: %w", err)
-		}
 		err = insertRecentTracks(database, user, recent_tracks)
 		if err != nil {
 			return fmt.Errorf("updateDatabase: %w", err)
