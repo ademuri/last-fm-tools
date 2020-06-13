@@ -6,6 +6,20 @@ import (
 	"time"
 )
 
+func parseDateRangeFromArgs(args []string) (start time.Time, end time.Time, err error) {
+	switch len(args) {
+	case 1:
+		start, end, err = getImplicitDateRange(args[0])
+
+	case 2:
+		start, end, err = getExplicitDateRange(args[0], args[1])
+
+	default:
+		err = fmt.Errorf("Expected one or two date arguments")
+	}
+	return
+}
+
 func getImplicitDateRange(ds string) (start time.Time, end time.Time, err error) {
 	date, err := parseSingleDatestring(ds)
 	if err != nil {

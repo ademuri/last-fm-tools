@@ -63,21 +63,7 @@ type ParsedDate struct {
 }
 
 func printTopAlbums(dbPath string, args []string, numToReturn int) error {
-	var start, end time.Time
-	var err error
-	switch len(args) {
-	case 1:
-		start, end, err = getImplicitDateRange(args[0])
-
-	case 2:
-		start, end, err = getExplicitDateRange(args[0], args[1])
-
-	default:
-		return fmt.Errorf("Expected one or two date arguments")
-	}
-	if err != nil {
-		return fmt.Errorf("Parsing date range: %w", err)
-	}
+	start, end, err := parseDateRangeFromArgs(args)
 
 	db, err := openDb(dbPath)
 	if err != nil {
