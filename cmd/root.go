@@ -27,6 +27,7 @@ import (
 
 var cfgFile string
 var lastFmUser string
+var databasePath string
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -51,8 +52,11 @@ func init() {
 	cobra.OnInitialize(initConfig)
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.last-fm-tools.yaml)")
+
 	rootCmd.PersistentFlags().StringVarP(&lastFmUser, "user", "u", "", "last.fm username to act on")
 	rootCmd.MarkPersistentFlagRequired("user")
+
+	rootCmd.PersistentFlags().StringVarP(&databasePath, "database", "d", "./lastfm.db", "Path to the SQLite database")
 }
 
 // initConfig reads in config file and ENV variables if set.
