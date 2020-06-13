@@ -6,6 +6,13 @@ import (
 	"time"
 )
 
+type ParsedDate struct {
+	Date  time.Time
+	Year  bool
+	Month bool
+	Day   bool
+}
+
 func parseDateRangeFromArgs(args []string) (start time.Time, end time.Time, err error) {
 	switch len(args) {
 	case 1:

@@ -6,6 +6,7 @@ go_library(
         "date.go",
         "root.go",
         "topAlbums.go",
+        "topArtists.go",
         "update.go",
     ],
     importpath = "github.com/ademuri/last-fm-tools/cmd",
