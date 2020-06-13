@@ -10,6 +10,21 @@ $ last-fm-tools top-artists 2020-01 --user=foo
 $ last-fm-tools top-albums 2020-01-01 2020-02-01 --user=foo --number=20
 ```
 
+## Configuration
+
+Configuration options
+
+- `api_key` and `secret` come from [https://www.last.fm/api/account/create]. Note that last.fm doesn't save these values, so you'll need to put them somewhere safe (e.g. the config file mentioned below, or a password manager).
+- `user` is the last.fm username.
+- `database` is the path to the sqlite database file. 
+
+These may be specified either as normal flags, or as configuration options in `$HOME/.last-fm-tools.yaml`, forex:
+
+```yaml
+api_key: "deadbeefbadfood"
+database: "$HOME/lastfm.db"
+```
+
 # Building
 
 This project uses [bazel](https://bazel.build/) for building. It's the only required dependency. To build and run directly using Bazel:
