@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -109,19 +110,28 @@ func printTopAlbums(dbPath string, args []string, numToReturn int) error {
 		return fmt.Errorf("printTopAlbums: %w", err)
 	}
 
-	n := 0
+	numAlbums := 0
+	var numListens int64 = 0
 	table := tablewriter.NewWriter(os.Stdout)
 	table.SetHeader([]string{"Artist", "Album", "Listens"})
 	for countQuery.Next() {
 		album := make([]string, 3)
 		countQuery.Scan(&album[0], &album[1], &album[2])
-		if n < numToReturn {
+		if numAlbums < numToReturn {
 			table.Append(album)
 		}
-		n += 1
+		numAlbums += 1
+		listens, err := strconv.ParseInt(album[2], 10, 64)
+		if err != nil {
+			return fmt.Errorf("counting listens: %w", err)
+		}
+		numListens += listens
 	}
 	table.Render()
-	fmt.Printf("Found %d albums\n", n)
+
+	const dateFormat = "2006-01-02"
+	fmt.Printf("Found %d albums and %d listens from %s to %s\n",
+		numAlbums, numListens, start.Format(dateFormat), end.Format(dateFormat))
 
 	return nil
 }
