@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = [
+        "date.go",
         "root.go",
         "topAlbums.go",
         "update.go",
@@ -27,6 +28,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "date_test.go",
         "topAlbums_test.go",
         "update_test.go",
     ],
