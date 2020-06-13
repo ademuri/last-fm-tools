@@ -18,18 +18,21 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strings"
+	"time"
 
+	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 var topAlbumsCmd = &cobra.Command{
-	Use:   "top-albums",
+	Use:   "top-albums [date string]",
 	Short: "Gets the user's top albums",
 	Long:  `TODO`,
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		err := getTopAlbums(viper.GetString("database"))
+		err := getTopAlbums(viper.GetString("database"), args[0])
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)
@@ -51,7 +54,13 @@ func init() {
 	// topAlbumsCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
 
-func getTopAlbums(dbPath string) error {
+type AlbumCount struct {
+	Artist string
+	Name   string
+	Count  int64
+}
+
+func getTopAlbums(dbPath string, ds string) error {
 	db, err := openDb(dbPath)
 	if err != nil {
 		return fmt.Errorf("getTopAlbums: %w", err)
@@ -64,6 +73,43 @@ func getTopAlbums(dbPath string) error {
 	if !exists {
 		return fmt.Errorf("Database doesn't exist - run update first.")
 	}
+
+	start, err := time.Parse("2006-01", ds)
+	if err != nil {
+		return fmt.Errorf("getTopAlbums(%q): %w", ds, err)
+	}
+	end := start.AddDate(0, 1, 0)
+
+	user := strings.ToLower(viper.GetString("user"))
+
+	const countQueryString = `
+	SELECT Track.artist, Track.album, COUNT(Listen.id)
+	FROM Listen
+	INNER JOIN Track ON Track.id = Listen.track
+	WHERE user = ?
+	AND Listen.date BETWEEN ? AND ?
+	GROUP BY Track.artist, Track.album
+	ORDER BY COUNT(*) DESC
+	;
+	`
+	countQuery, err := db.Query(countQueryString, user, start.Unix(), end.Unix())
+	if err != nil {
+		return fmt.Errorf("getTopAlbums(%q): %w", ds, err)
+	}
+
+	n := 0
+	table := tablewriter.NewWriter(os.Stdout)
+	table.SetHeader([]string{"Artist", "Album", "Listens"})
+	for countQuery.Next() {
+		album := make([]string, 3)
+		countQuery.Scan(&album[0], &album[1], &album[2])
+		if n < 10 {
+			table.Append(album)
+		}
+		n += 1
+	}
+	table.Render()
+	fmt.Printf("Found %d albums\n", n)
 
 	return nil
 }

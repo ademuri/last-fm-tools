@@ -189,6 +189,9 @@ func insertRecentTracks(db *sql.DB, user string, recent_tracks lastfm.UserGetRec
 		if err != nil {
 			return fmt.Errorf("insertRecentTracks(page=%v): %w", recent_tracks.Page, err)
 		}
+		if track_id == 0 {
+			return fmt.Errorf("createTrack(%q, %q, %q) returned 0", track.Artist.Name, track.Album.Name, track.Name)
+		}
 
 		err = createListen(db, user, track_id, track.Date.Uts)
 		if err != nil {
@@ -242,7 +245,7 @@ func createTrack(db *sql.DB, artist string, album string, name string) (id int64
 
 	if track_exists.Next() {
 		var id int64
-		track_exists.Scan(id)
+		track_exists.Scan(&id)
 		return id, nil
 	}
 

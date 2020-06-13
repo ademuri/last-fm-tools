@@ -23,11 +23,23 @@ import (
 )
 
 func TestDatabaseDoesntExist(t *testing.T) {
-	err := getTopAlbums(os.Getenv("TEST_TMPDIR") + "/lastfm.db")
+	err := getTopAlbums(os.Getenv("TEST_TMPDIR")+"/lastfm.db", "2020-05")
 	if err == nil {
 		t.Fatalf("getTopAlbums should have errored with no database")
 	}
 	if !strings.Contains(err.Error(), "doesn't exist") {
 		t.Fatalf("getTopAlbums should have said the db doesn't exist: %w", err)
+	}
+}
+
+func TestInvalidDateString(t *testing.T) {
+	err := getTopAlbums(os.Getenv("TEST_TMPDIR")+"/lastfm.db", "")
+	if err == nil {
+		t.Fatalf("getTopAlbums should have errored with no date string")
+	}
+
+	err = getTopAlbums(os.Getenv("TEST_TMPDIR")+"/lastfm.db", "derp")
+	if err == nil {
+		t.Fatalf("getTopAlbums should have errored with an invalid date string")
 	}
 }

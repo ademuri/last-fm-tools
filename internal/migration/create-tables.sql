@@ -24,7 +24,7 @@ CREATE TABLE Album (
 );
 
 CREATE TABLE Track (
-  id INTEGER IDENTITY(1, 1) PRIMARY KEY,
+  id INTEGER PRIMARY KEY,
   name TEXT,
   artist TEXT,
   album TEXT,
@@ -39,12 +39,12 @@ CREATE TABLE User (
 );
 
 CREATE TABLE Listen (
-  id INTEGER IDENTITY(1, 1) PRIMARY KEY,
+  id INTEGER PRIMARY KEY,
   date DATETIME,
   track INTEGER,
-  user INTEGER,
+  user TEXT,
   FOREIGN KEY (track) REFERENCES Track(id),
-  FOREIGN KEY (user) REFERENCES User(id)
+  FOREIGN KEY (user) REFERENCES User(name)
 );
 CREATE INDEX idx_listen_date ON Listen (user, date);
 CREATE INDEX idx_listen_exact ON Listen (user, track, date);
