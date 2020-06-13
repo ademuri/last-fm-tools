@@ -31,6 +31,7 @@ go_test(
     srcs = [
         "date_test.go",
         "topAlbums_test.go",
+        "topArtists_test.go",
         "update_test.go",
     ],
     embed = [":go_default_library"],

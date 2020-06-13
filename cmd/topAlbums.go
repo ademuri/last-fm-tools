@@ -48,12 +48,6 @@ func init() {
 	viper.BindPFlag("number", topAlbumsCmd.Flags().Lookup("number"))
 }
 
-type AlbumCount struct {
-	Artist string
-	Name   string
-	Count  int64
-}
-
 func printTopAlbums(dbPath string, args []string, numToReturn int) error {
 	start, end, err := parseDateRangeFromArgs(args)
 
