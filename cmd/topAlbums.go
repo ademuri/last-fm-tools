@@ -33,7 +33,7 @@ var topAlbumsCmd = &cobra.Command{
 	Long:  `Uses the specified date or date range. Date strings look like 'yyyy', 'yyyy-mm', or 'yyyy-mm-dd'.`,
 	Args:  cobra.RangeArgs(1, 2),
 	Run: func(cmd *cobra.Command, args []string) {
-		err := printTopAlbums(viper.GetString("database"), args)
+		err := printTopAlbums(viper.GetString("database"), args, viper.GetInt("number"))
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)
@@ -43,6 +43,10 @@ var topAlbumsCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(topAlbumsCmd)
+
+	var number int
+	topAlbumsCmd.Flags().IntVarP(&number, "number", "n", 10, "number of results to return")
+	viper.BindPFlag("number", topAlbumsCmd.Flags().Lookup("number"))
 }
 
 type AlbumCount struct {
@@ -58,7 +62,7 @@ type ParsedDate struct {
 	Day   bool
 }
 
-func printTopAlbums(dbPath string, args []string) error {
+func printTopAlbums(dbPath string, args []string, numToReturn int) error {
 	var start, end time.Time
 	var err error
 	switch len(args) {
@@ -111,7 +115,7 @@ func printTopAlbums(dbPath string, args []string) error {
 	for countQuery.Next() {
 		album := make([]string, 3)
 		countQuery.Scan(&album[0], &album[1], &album[2])
-		if n < 10 {
+		if n < numToReturn {
 			table.Append(album)
 		}
 		n += 1
