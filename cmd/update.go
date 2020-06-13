@@ -36,6 +36,7 @@ import (
 )
 
 var afterString string
+var force bool
 
 // updateCmd represents the update command
 var updateCmd = &cobra.Command{
@@ -43,7 +44,7 @@ var updateCmd = &cobra.Command{
 	Short: "Fetches data from last.fm",
 	Long:  `Stores data in a local SQLite database.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		err := updateDatabase()
+		err := updateDatabase(force)
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)
@@ -54,19 +55,11 @@ var updateCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(updateCmd)
 
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// updateCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// updateCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 	updateCmd.Flags().StringVar(&afterString, "after", "", "Only get listening data after this date, in yyyy-mm-dd format")
+	updateCmd.Flags().BoolVarP(&force, "force", "f", false, "Get all listening data, regardless of what's already present (idempotent)")
 }
 
-func updateDatabase() error {
+func updateDatabase(force bool) error {
 	var after time.Time
 	var err error
 	if len(afterString) > 0 {
@@ -88,6 +81,12 @@ func updateDatabase() error {
 	if err != nil {
 		return fmt.Errorf("updateDatabase: %w", err)
 	}
+
+	latestListen, err := getLatestListen(database, user)
+	if err != nil {
+		return fmt.Errorf("updateDatabase: %w", err)
+	}
+	fmt.Printf("Latest local listening data is from %s\n", latestListen.Format("2006-01-02"))
 
 	fmt.Printf("Updating database for %q\n", user)
 	limiter := rate.NewLimiter(rate.Every(1*time.Second), 1)
@@ -141,6 +140,10 @@ func updateDatabase() error {
 			break
 		}
 		if page >= pages {
+			break
+		}
+		if !force && oldestDate.Before(latestListen.AddDate(0, 0, -7)) {
+			fmt.Println("Refreshed back to existing data")
 			break
 		}
 
@@ -298,4 +301,20 @@ func createListen(db *sql.DB, user string, track_id int64, datetime string) (err
 		return fmt.Errorf("createListen(%q, %q, %q): %w", user, track_id, datetime, err)
 	}
 	return nil
+}
+
+func getLatestListen(db *sql.DB, user string) (date time.Time, err error) {
+	query, err := db.Query("SELECT date FROM Listen WHERE user = ? ORDER BY Date desc LIMIT 1", user)
+	if err != nil {
+		err = fmt.Errorf("getLatestListen(%q): %w", user, err)
+		return
+	}
+	defer query.Close()
+
+	if !query.Next() {
+		return
+	}
+
+	query.Scan(&date)
+	return
 }
