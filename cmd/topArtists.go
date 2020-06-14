@@ -26,14 +26,14 @@ import (
 	"github.com/spf13/viper"
 )
 
-// topArtistsCmd represents the topArtists command
+var topArtistsNumber int
 var topArtistsCmd = &cobra.Command{
 	Use:   "top-artists [from] [to (optional)]",
 	Short: "Gets the user's top artists",
 	Long:  `Uses the specified date or date range. Date strings look like 'yyyy', 'yyyy-mm', or 'yyyy-mm-dd'.`,
 	Args:  cobra.RangeArgs(1, 2),
 	Run: func(cmd *cobra.Command, args []string) {
-		err := printTopArtists(viper.GetString("database"), args, viper.GetInt("number"))
+		err := printTopArtists(viper.GetString("database"), args, topArtistsNumber)
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)
@@ -44,9 +44,7 @@ var topArtistsCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(topArtistsCmd)
 
-	var number int
-	topArtistsCmd.Flags().IntVarP(&number, "number", "n", 10, "number of results to return")
-	viper.BindPFlag("number", topArtistsCmd.Flags().Lookup("number"))
+	topArtistsCmd.Flags().IntVarP(&topArtistsNumber, "number", "n", 10, "number of results to return")
 }
 
 func printTopArtists(dbPath string, args []string, numToReturn int) error {

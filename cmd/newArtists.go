@@ -29,14 +29,14 @@ import (
 	"github.com/spf13/viper"
 )
 
-var number int
+var newArtistsNumber int
 var newArtistsCmd = &cobra.Command{
 	Use:   "new-artists [from] [to (optional)]",
 	Short: "Gets new artists for the given time period",
 	Long:  `Uses the specified date or date range. Date strings look like 'yyyy', 'yyyy-mm', or 'yyyy-mm-dd'.`,
 	Args:  cobra.RangeArgs(1, 2),
 	Run: func(cmd *cobra.Command, args []string) {
-		err := printNewArtists(viper.GetString("database"), args, number)
+		err := printNewArtists(viper.GetString("database"), args, newArtistsNumber)
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)
@@ -52,7 +52,7 @@ type ArtistCount struct {
 func init() {
 	rootCmd.AddCommand(newArtistsCmd)
 
-	newArtistsCmd.Flags().IntVarP(&number, "number", "n", 0, "number of results to return")
+	newArtistsCmd.Flags().IntVarP(&newArtistsNumber, "number", "n", 0, "number of results to return")
 }
 
 func printNewArtists(dbPath string, args []string, numToReturn int) error {

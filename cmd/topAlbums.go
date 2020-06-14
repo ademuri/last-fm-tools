@@ -26,13 +26,14 @@ import (
 	"github.com/spf13/viper"
 )
 
+var topAlbumsNumber int
 var topAlbumsCmd = &cobra.Command{
 	Use:   "top-albums [from] [to (optional)]",
 	Short: "Gets the user's top albums",
 	Long:  `Uses the specified date or date range. Date strings look like 'yyyy', 'yyyy-mm', or 'yyyy-mm-dd'.`,
 	Args:  cobra.RangeArgs(1, 2),
 	Run: func(cmd *cobra.Command, args []string) {
-		err := printTopAlbums(viper.GetString("database"), args, viper.GetInt("number"))
+		err := printTopAlbums(viper.GetString("database"), args, topAlbumsNumber)
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)
@@ -43,9 +44,7 @@ var topAlbumsCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(topAlbumsCmd)
 
-	var number int
-	topAlbumsCmd.Flags().IntVarP(&number, "number", "n", 10, "number of results to return")
-	viper.BindPFlag("number", topAlbumsCmd.Flags().Lookup("number"))
+	topAlbumsCmd.Flags().IntVarP(&topAlbumsNumber, "number", "n", 10, "number of results to return")
 }
 
 func printTopAlbums(dbPath string, args []string, numToReturn int) error {
