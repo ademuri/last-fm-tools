@@ -153,7 +153,7 @@ func updateDatabase(force bool) error {
 }
 
 func createDatabase() (*sql.DB, error) {
-	database, err := sql.Open("sqlite3", databasePath)
+	database, err := sql.Open("sqlite3", viper.GetString("database"))
 	if err != nil {
 		return nil, fmt.Errorf("createDatabase: %w", err)
 	}

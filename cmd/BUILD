@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "date.go",
+        "newArtists.go",
         "root.go",
         "topAlbums.go",
         "topArtists.go",
