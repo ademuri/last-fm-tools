@@ -18,6 +18,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/sendgrid/sendgrid-go"
 	"github.com/sendgrid/sendgrid-go/helpers/mail"
@@ -54,13 +55,25 @@ func sendEmail(dbPath string, fromAddress string, args []string) error {
 		return fmt.Errorf("Expected exactly one recipient email address")
 	}
 
+	out := ""
+
+	now := time.Now()
+	start := time.Date(now.Year()-1, now.Month(), 0, 0, 0, 0, 0, now.Location())
+	end := start.AddDate(0, 1, 0)
+
+	out += "Top albums for " + start.Format("2006-01")
+	topAlbumsOut, err := getTopAlbums(dbPath, 20, start, end)
+	if err != nil {
+		return fmt.Errorf("sendEmail: %w", err)
+	}
+	out += topAlbumsOut
+
 	from := mail.NewEmail("last-fm-tools", fromAddress)
-	subject := "last.fm report"
+	subject := fmt.Sprintf("Listening report for %s", start.Format("2006-01"))
 	to := mail.NewEmail(args[0], args[0])
-	body := "My first email"
-	message := mail.NewSingleEmail(from, subject, to, body, body)
+	message := mail.NewSingleEmail(from, subject, to, topAlbumsOut, fmt.Sprintf("<pre>%s</pre>", out))
 	client := sendgrid.NewSendClient(viper.GetString("sendgrid_api_key"))
-	_, err := client.Send(message)
+	_, err = client.Send(message)
 	if err != nil {
 		return fmt.Errorf("email: %w", err)
 	}
