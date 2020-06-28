@@ -32,7 +32,7 @@ var emailCmd = &cobra.Command{
 	Long:  `Emails history to the specified user.`,
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		err := sendEmail(viper.GetString("database"), viper.GetString("from"), args)
+		err := sendEmail(viper.GetString("database"), viper.GetString("from"), viper.GetBool("dry_run"), args)
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)
@@ -48,9 +48,13 @@ func init() {
 	var from string
 	emailCmd.Flags().StringVar(&from, "from", "", "From email address")
 	viper.BindPFlag("from", emailCmd.Flags().Lookup("from"))
+
+	var dryRun bool
+	emailCmd.Flags().BoolVarP(&dryRun, "dry_run", "n", false, "When true, just print instead of emailing")
+	viper.BindPFlag("dry_run", emailCmd.Flags().Lookup("dry_run"))
 }
 
-func sendEmail(dbPath string, fromAddress string, args []string) error {
+func sendEmail(dbPath string, fromAddress string, dryRun bool, args []string) error {
 	if len(args) != 1 {
 		return fmt.Errorf("Expected exactly one recipient email address")
 	}
@@ -61,21 +65,25 @@ func sendEmail(dbPath string, fromAddress string, args []string) error {
 	start := time.Date(now.Year()-1, now.Month(), 0, 0, 0, 0, 0, now.Location())
 	end := start.AddDate(0, 1, 0)
 
-	out += "Top albums for " + start.Format("2006-01")
+	out += fmt.Sprintf("Top albums for %s:\n", start.Format("2006-01"))
 	topAlbumsOut, err := getTopAlbums(dbPath, 20, start, end)
 	if err != nil {
 		return fmt.Errorf("sendEmail: %w", err)
 	}
 	out += topAlbumsOut
 
-	from := mail.NewEmail("last-fm-tools", fromAddress)
-	subject := fmt.Sprintf("Listening report for %s", start.Format("2006-01"))
-	to := mail.NewEmail(args[0], args[0])
-	message := mail.NewSingleEmail(from, subject, to, topAlbumsOut, fmt.Sprintf("<pre>%s</pre>", out))
-	client := sendgrid.NewSendClient(viper.GetString("sendgrid_api_key"))
-	_, err = client.Send(message)
-	if err != nil {
-		return fmt.Errorf("email: %w", err)
+	if dryRun {
+		fmt.Printf("Would have sent email: \n%s\n", out)
+	} else {
+		from := mail.NewEmail("last-fm-tools", fromAddress)
+		subject := fmt.Sprintf("Listening report for %s", start.Format("2006-01"))
+		to := mail.NewEmail(args[0], args[0])
+		message := mail.NewSingleEmail(from, subject, to, topAlbumsOut, fmt.Sprintf("<pre>%s</pre>", out))
+		client := sendgrid.NewSendClient(viper.GetString("sendgrid_api_key"))
+		_, err = client.Send(message)
+		if err != nil {
+			return fmt.Errorf("email: %w", err)
+		}
 	}
 
 	return nil
