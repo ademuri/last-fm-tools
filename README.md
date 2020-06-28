@@ -17,12 +17,17 @@ Configuration options
 - `api_key` and `secret` come from [https://www.last.fm/api/account/create]. Note that last.fm doesn't save these values, so you'll need to put them somewhere safe (e.g. the config file mentioned below, or a password manager).
 - `user` is the last.fm username.
 - `database` is the path to the sqlite database file. 
+- `sendgrid_api_key` (optional) is the API key for SendGrid, used for sending email reports
+- `from` (optional) is the email address to send reports from
 
 These may be specified either as normal flags, or as configuration options in `$HOME/.last-fm-tools.yaml`, forex:
 
 ```yaml
-api_key: "deadbeefbadfood"
 database: "$HOME/lastfm.db"
+api_key: ""
+secret: ""
+sendgrid_api_key: ""
+from: "me@me.com"
 ```
 
 # Building
