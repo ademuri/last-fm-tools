@@ -12,6 +12,8 @@ require (
 	github.com/mitchellh/mapstructure v1.3.2 // indirect
 	github.com/olekukonko/tablewriter v0.0.4
 	github.com/pelletier/go-toml v1.8.0 // indirect
+	github.com/sendgrid/rest v2.6.0+incompatible // indirect
+	github.com/sendgrid/sendgrid-go v3.6.0+incompatible // indirect
 	github.com/shkh/lastfm-go v0.0.0-20191215035245-89a801c244e0
 	github.com/spf13/afero v1.2.2 // indirect
 	github.com/spf13/cast v1.3.1 // indirect

@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "date.go",
+        "email.go",
         "newAlbums.go",
         "newArtists.go",
         "root.go",
@@ -19,6 +20,8 @@ go_library(
         "@com_github_mattn_go_sqlite3//:go_default_library",
         "@com_github_mitchellh_go_homedir//:go_default_library",
         "@com_github_olekukonko_tablewriter//:go_default_library",
+        "@com_github_sendgrid_sendgrid_go//:go_default_library",
+        "@com_github_sendgrid_sendgrid_go//helpers/mail:go_default_library",
         "@com_github_shkh_lastfm_go//lastfm:go_default_library",
         "@com_github_spf13_cobra//:go_default_library",
         "@com_github_spf13_pflag//:go_default_library",

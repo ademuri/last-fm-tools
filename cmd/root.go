@@ -32,6 +32,7 @@ var lastFmApiKey string
 var lastFmSecret string
 var lastFmUser string
 var databasePath string
+var sendgridApiKey string
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -76,6 +77,9 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(
 		&databasePath, "database", "d", "./lastfm.db", "Path to the SQLite database")
 	viper.BindPFlag("database", rootCmd.PersistentFlags().Lookup("database"))
+
+	rootCmd.PersistentFlags().StringVar(&sendgridApiKey, "sendgrid_api_key", "", "SendGrid API key, for sending email reports")
+	viper.BindPFlag("sendgrid_api_key", rootCmd.PersistentFlags().Lookup("sendgrid_api_key"))
 }
 
 // initConfig reads in config file and ENV variables if set.
