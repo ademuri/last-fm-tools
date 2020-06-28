@@ -60,17 +60,34 @@ func sendEmail(dbPath string, fromAddress string, dryRun bool, args []string) er
 	}
 
 	out := ""
-
 	now := time.Now()
-	start := time.Date(now.Year()-1, now.Month(), 0, 0, 0, 0, 0, now.Location())
-	end := start.AddDate(0, 1, 0)
 
+	start := time.Date(now.Year()-1, now.Month(), 1, 0, 0, 0, 0, now.Location())
+	end := start.AddDate(0, 1, 0)
 	out += fmt.Sprintf("Top albums for %s:\n", start.Format("2006-01"))
 	topAlbumsOut, err := getTopAlbums(dbPath, 20, start, end)
 	if err != nil {
 		return fmt.Errorf("sendEmail: %w", err)
 	}
-	out += topAlbumsOut
+	out += topAlbumsOut + "\n\n"
+
+	start = time.Date(now.Year()-2, now.Month(), 1, 0, 0, 0, 0, now.Location())
+	end = start.AddDate(0, 1, 0)
+	out += fmt.Sprintf("Top albums for %s:\n", start.Format("2006-01"))
+	topAlbumsOut, err = getTopAlbums(dbPath, 20, start, end)
+	if err != nil {
+		return fmt.Errorf("sendEmail: %w", err)
+	}
+	out += topAlbumsOut + "\n\n"
+
+	start = time.Date(now.Year()-3, now.Month(), 1, 0, 0, 0, 0, now.Location())
+	end = start.AddDate(0, 1, 0)
+	out += fmt.Sprintf("Top albums for %s:\n", start.Format("2006-01"))
+	topAlbumsOut, err = getTopAlbums(dbPath, 20, start, end)
+	if err != nil {
+		return fmt.Errorf("sendEmail: %w", err)
+	}
+	out += topAlbumsOut + "\n\n"
 
 	if dryRun {
 		fmt.Printf("Would have sent email: \n%s\n", out)
@@ -82,7 +99,7 @@ func sendEmail(dbPath string, fromAddress string, dryRun bool, args []string) er
 		client := sendgrid.NewSendClient(viper.GetString("sendgrid_api_key"))
 		_, err = client.Send(message)
 		if err != nil {
-			return fmt.Errorf("email: %w", err)
+			return fmt.Errorf("sendEmail: %w", err)
 		}
 	}
 
