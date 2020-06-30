@@ -16,10 +16,12 @@ limitations under the License.
 package cmd
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
@@ -33,7 +35,7 @@ var topArtistsCmd = &cobra.Command{
 	Long:  `Uses the specified date or date range. Date strings look like 'yyyy', 'yyyy-mm', or 'yyyy-mm-dd'.`,
 	Args:  cobra.RangeArgs(1, 2),
 	Run: func(cmd *cobra.Command, args []string) {
-		err := printTopArtists(viper.GetString("database"), args, topArtistsNumber)
+		err := printTopArtists(viper.GetString("database"), topArtistsNumber, args)
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)
@@ -47,20 +49,29 @@ func init() {
 	topArtistsCmd.Flags().IntVarP(&topArtistsNumber, "number", "n", 10, "number of results to return")
 }
 
-func printTopArtists(dbPath string, args []string, numToReturn int) error {
+func printTopArtists(dbPath string, numToReturn int, args []string) error {
 	start, end, err := parseDateRangeFromArgs(args)
 
+	out, err := getTopArtists(dbPath, numToReturn, start, end)
+	if err != nil {
+		return err
+	}
+	fmt.Println(out)
+	return nil
+}
+
+func getTopArtists(dbPath string, numToReturn int, start time.Time, end time.Time) (string, error) {
 	db, err := openDb(dbPath)
 	if err != nil {
-		return fmt.Errorf("printTopArtists: %w", err)
+		return "", fmt.Errorf("printTopArtists: %w", err)
 	}
 
 	exists, err := dbExists(db)
 	if err != nil {
-		return fmt.Errorf("printTopArtists: %w", err)
+		return "", fmt.Errorf("printTopArtists: %w", err)
 	}
 	if !exists {
-		return fmt.Errorf("Database doesn't exist - run update first.")
+		return "", fmt.Errorf("Database doesn't exist - run update first.")
 	}
 
 	user := strings.ToLower(viper.GetString("user"))
@@ -77,12 +88,13 @@ func printTopArtists(dbPath string, args []string, numToReturn int) error {
 	`
 	countQuery, err := db.Query(countQueryString, user, start.Unix(), end.Unix())
 	if err != nil {
-		return fmt.Errorf("printTopArtists: %w", err)
+		return "", fmt.Errorf("printTopArtists: %w", err)
 	}
 
+	out := new(bytes.Buffer)
 	numArtists := 0
 	var numListens int64 = 0
-	table := tablewriter.NewWriter(os.Stdout)
+	table := tablewriter.NewWriter(out)
 	table.SetHeader([]string{"Artist", "Listens"})
 	for countQuery.Next() {
 		artist := make([]string, 2)
@@ -93,15 +105,15 @@ func printTopArtists(dbPath string, args []string, numToReturn int) error {
 		numArtists += 1
 		listens, err := strconv.ParseInt(artist[1], 10, 64)
 		if err != nil {
-			return fmt.Errorf("counting listens: %w", err)
+			return "", fmt.Errorf("counting listens: %w", err)
 		}
 		numListens += listens
 	}
 	table.Render()
 
 	const dateFormat = "2006-01-02"
-	fmt.Printf("Found %d artists and %d listens from %s to %s\n",
+	fmt.Fprintf(out, "Found %d artists and %d listens from %s to %s\n",
 		numArtists, numListens, start.Format(dateFormat), end.Format(dateFormat))
 
-	return nil
+	return out.String(), nil
 }

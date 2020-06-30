@@ -23,7 +23,7 @@ import (
 )
 
 func TestPrintTopArtistsDatabaseDoesntExist(t *testing.T) {
-	err := printTopArtists(os.Getenv("TEST_TMPDIR")+"/lastfm.db", []string{"2020-05"}, 10)
+	err := printTopArtists(os.Getenv("TEST_TMPDIR")+"/lastfm.db", 10, []string{"2020-05"})
 	if err == nil {
 		t.Fatalf("printTopArtists should have errored with no database")
 	}
@@ -33,12 +33,12 @@ func TestPrintTopArtistsDatabaseDoesntExist(t *testing.T) {
 }
 
 func TestPrintTopArtistsInvalidDateString(t *testing.T) {
-	err := printTopArtists(os.Getenv("TEST_TMPDIR")+"/lastfm.db", []string{}, 10)
+	err := printTopArtists(os.Getenv("TEST_TMPDIR")+"/lastfm.db", 10, []string{})
 	if err == nil {
 		t.Fatalf("printTopArtists should have errored with no date string")
 	}
 
-	err = printTopArtists(os.Getenv("TEST_TMPDIR")+"/lastfm.db", []string{"derp"}, 10)
+	err = printTopArtists(os.Getenv("TEST_TMPDIR")+"/lastfm.db", 10, []string{"derp"})
 	if err == nil {
 		t.Fatalf("printTopArtists should have errored with an invalid date string")
 	}

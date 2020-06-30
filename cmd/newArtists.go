@@ -16,6 +16,7 @@ limitations under the License.
 package cmd
 
 import (
+	"bytes"
 	"database/sql"
 	"fmt"
 	"os"
@@ -36,7 +37,7 @@ var newArtistsCmd = &cobra.Command{
 	Long:  `Uses the specified date or date range. Date strings look like 'yyyy', 'yyyy-mm', or 'yyyy-mm-dd'.`,
 	Args:  cobra.RangeArgs(1, 2),
 	Run: func(cmd *cobra.Command, args []string) {
-		err := printNewArtists(viper.GetString("database"), args, newArtistsNumber)
+		err := printNewArtists(viper.GetString("database"), newArtistsNumber, args)
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)
@@ -55,33 +56,43 @@ func init() {
 	newArtistsCmd.Flags().IntVarP(&newArtistsNumber, "number", "n", 0, "number of results to return")
 }
 
-func printNewArtists(dbPath string, args []string, numToReturn int) error {
+func printNewArtists(dbPath string, numToReturn int, args []string) error {
 	start, end, err := parseDateRangeFromArgs(args)
 
+	out, err := getNewArtists(dbPath, numToReturn, start, end)
+	if err != nil {
+		return err
+	}
+	fmt.Println(out)
+	return nil
+}
+
+func getNewArtists(dbPath string, numToReturn int, start time.Time, end time.Time) (string, error) {
 	db, err := openDb(dbPath)
 	if err != nil {
-		return fmt.Errorf("printNewArtists: %w", err)
+		return "", fmt.Errorf("printNewArtists: %w", err)
 	}
 
 	exists, err := dbExists(db)
 	if err != nil {
-		return fmt.Errorf("printNewArtists: %w", err)
+		return "", fmt.Errorf("printNewArtists: %w", err)
 	}
 	if !exists {
-		return fmt.Errorf("Database doesn't exist - run update first.")
+		return "", fmt.Errorf("Database doesn't exist - run update first.")
 	}
 
+	out := new(bytes.Buffer)
 	user := strings.ToLower(viper.GetString("user"))
 	var zeroTime time.Time
 	prevArtists, err := getArtistsForPeriod(db, user, zeroTime, start)
 	if err != nil {
-		return fmt.Errorf("printNewArtists: %w", err)
+		return "", fmt.Errorf("printNewArtists: %w", err)
 	}
 	curArtists, err := getArtistsForPeriod(db, user, start, end)
 	if err != nil {
-		return fmt.Errorf("printNewArtists: %w", err)
+		return "", fmt.Errorf("printNewArtists: %w", err)
 	}
-	fmt.Printf("Got %d prev artists, %d cur artists\n", len(prevArtists), len(curArtists))
+	fmt.Fprintf(out, "Got %d prev artists, %d cur artists\n", len(prevArtists), len(curArtists))
 
 	counts := make([]ArtistCount, 0)
 	for artist, count := range curArtists {
@@ -93,7 +104,7 @@ func printNewArtists(dbPath string, args []string, numToReturn int) error {
 		return counts[i].Count > counts[j].Count
 	})
 
-	table := tablewriter.NewWriter(os.Stdout)
+	table := tablewriter.NewWriter(out)
 	table.SetHeader([]string{"Artist"})
 	n := 0
 	for _, count := range counts {
@@ -105,7 +116,7 @@ func printNewArtists(dbPath string, args []string, numToReturn int) error {
 	}
 	table.Render()
 
-	return nil
+	return out.String(), nil
 }
 
 func getArtistsForPeriod(db *sql.DB, user string, start time.Time, end time.Time) (map[string]int64, error) {

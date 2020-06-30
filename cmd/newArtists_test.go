@@ -23,7 +23,7 @@ import (
 )
 
 func TestPrintNewArtistsDatabaseDoesntExist(t *testing.T) {
-	err := printNewArtists(os.Getenv("TEST_TMPDIR")+"/lastfm.db", []string{"2020-05"}, 10)
+	err := printNewArtists(os.Getenv("TEST_TMPDIR")+"/lastfm.db", 10, []string{"2020-05"})
 	if err == nil {
 		t.Fatalf("printNewArtists should have errored with no database")
 	}
