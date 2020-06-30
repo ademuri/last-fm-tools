@@ -55,6 +55,9 @@ type AlbumCount struct {
 	Count int64
 }
 
+type NewAlbumsAnalyzer struct {
+}
+
 func init() {
 	rootCmd.AddCommand(newAlbumsCmd)
 
@@ -64,7 +67,7 @@ func init() {
 func printNewAlbums(dbPath string, numToReturn int, args []string) error {
 	start, end, err := parseDateRangeFromArgs(args)
 
-	out, err := getNewAlbums(dbPath, numToReturn, start, end)
+	out, err := NewAlbumsAnalyzer{}.GetResults(dbPath, numToReturn, start, end)
 	if err != nil {
 		return err
 	}
@@ -72,7 +75,7 @@ func printNewAlbums(dbPath string, numToReturn int, args []string) error {
 	return nil
 }
 
-func getNewAlbums(dbPath string, numToReturn int, start time.Time, end time.Time) (string, error) {
+func (t NewAlbumsAnalyzer) GetResults(dbPath string, numToReturn int, start time.Time, end time.Time) (string, error) {
 	db, err := openDb(dbPath)
 	if err != nil {
 		return "", fmt.Errorf("printNewAlbums: %w", err)

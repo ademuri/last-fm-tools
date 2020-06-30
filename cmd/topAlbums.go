@@ -49,10 +49,13 @@ func init() {
 	topAlbumsCmd.Flags().IntVarP(&topAlbumsNumber, "number", "n", 10, "number of results to return")
 }
 
+type TopAlbumsAnalyzer struct {
+}
+
 func printTopAlbums(dbPath string, numToReturn int, args []string) error {
 	start, end, err := parseDateRangeFromArgs(args)
 
-	out, err := getTopAlbums(dbPath, numToReturn, start, end)
+	out, err := TopAlbumsAnalyzer{}.GetResults(dbPath, numToReturn, start, end)
 	if err != nil {
 		return err
 	}
@@ -60,7 +63,7 @@ func printTopAlbums(dbPath string, numToReturn int, args []string) error {
 	return nil
 }
 
-func getTopAlbums(dbPath string, numToReturn int, start time.Time, end time.Time) (string, error) {
+func (t TopAlbumsAnalyzer) GetResults(dbPath string, numToReturn int, start time.Time, end time.Time) (string, error) {
 	db, err := openDb(dbPath)
 	if err != nil {
 		return "", fmt.Errorf("getTopAlbums: %w", err)
