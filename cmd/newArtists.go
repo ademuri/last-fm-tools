@@ -56,9 +56,6 @@ func init() {
 	newArtistsCmd.Flags().IntVarP(&newArtistsNumber, "number", "n", 0, "number of results to return")
 }
 
-type NewArtistsAnalyzer struct {
-}
-
 func printNewArtists(dbPath string, numToReturn int, args []string) error {
 	start, end, err := parseDateRangeFromArgs(args)
 
@@ -68,6 +65,13 @@ func printNewArtists(dbPath string, numToReturn int, args []string) error {
 	}
 	fmt.Println(out)
 	return nil
+}
+
+type NewArtistsAnalyzer struct {
+}
+
+func (t NewArtistsAnalyzer) GetName() string {
+	return "New artists"
 }
 
 func (t NewArtistsAnalyzer) GetResults(dbPath string, numToReturn int, start time.Time, end time.Time) (string, error) {

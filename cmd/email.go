@@ -27,10 +27,11 @@ import (
 )
 
 var emailCmd = &cobra.Command{
-	Use:   "email <address>",
+	Use:   "email <address> <analysis_name...>",
 	Short: "Sends an email report",
-	Long:  `Emails history to the specified user.`,
-	Args:  cobra.ExactArgs(1),
+	Long: `Emails history to the specified user.
+  <analysis_name> is one or more of: top-artists, top-albums, new-artists, new-albums`,
+	Args: cobra.MinimumNArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
 		err := sendEmail(viper.GetString("database"), viper.GetString("from"), viper.GetBool("dry_run"), args)
 		if err != nil {
@@ -55,50 +56,62 @@ func init() {
 }
 
 func sendEmail(dbPath string, fromAddress string, dryRun bool, args []string) error {
-	if len(args) != 1 {
-		return fmt.Errorf("Expected exactly one recipient email address")
+	actionMap := map[string]Analyser{
+		"top-artists": TopArtistsAnalyzer{},
+		"top-albums":  TopAlbumsAnalyzer{},
+		"new-artists": NewArtistsAnalyzer{},
+		"new-albums":  NewAlbumsAnalyzer{},
+	}
+	actions := make([]Analyser, 0)
+	for _, actionName := range args[1:] {
+		action, ok := actionMap[actionName]
+		if !ok {
+			return fmt.Errorf("Invalid analysis_name: %s", actionName)
+		}
+		actions = append(actions, action)
 	}
 
 	out := ""
 	now := time.Now()
 
-	var topAlbumsAnalyzer TopAlbumsAnalyzer
-	start := time.Date(now.Year()-1, now.Month(), 1, 0, 0, 0, 0, now.Location())
-	end := start.AddDate(0, 1, 0)
-	out += fmt.Sprintf("Top albums for %s:\n", start.Format("2006-01"))
-	topAlbumsOut, err := topAlbumsAnalyzer.GetResults(dbPath, 20, start, end)
-	if err != nil {
-		return fmt.Errorf("sendEmail: %w", err)
-	}
-	out += topAlbumsOut + "\n\n"
+	for _, action := range actions {
+		start := time.Date(now.Year()-1, now.Month(), 1, 0, 0, 0, 0, now.Location())
+		end := start.AddDate(0, 1, 0)
+		out += fmt.Sprintf("%s for %s:\n", action.GetName(), start.Format("2006-01"))
+		topAlbumsOut, err := action.GetResults(dbPath, 20, start, end)
+		if err != nil {
+			return fmt.Errorf("sendEmail: %w", err)
+		}
+		out += topAlbumsOut + "\n\n"
 
-	start = time.Date(now.Year()-2, now.Month(), 1, 0, 0, 0, 0, now.Location())
-	end = start.AddDate(0, 1, 0)
-	out += fmt.Sprintf("Top albums for %s:\n", start.Format("2006-01"))
-	topAlbumsOut, err = topAlbumsAnalyzer.GetResults(dbPath, 20, start, end)
-	if err != nil {
-		return fmt.Errorf("sendEmail: %w", err)
-	}
-	out += topAlbumsOut + "\n\n"
+		start = time.Date(now.Year()-2, now.Month(), 1, 0, 0, 0, 0, now.Location())
+		end = start.AddDate(0, 1, 0)
+		out += fmt.Sprintf("%s for %s:\n", action.GetName(), start.Format("2006-01"))
+		topAlbumsOut, err = action.GetResults(dbPath, 20, start, end)
+		if err != nil {
+			return fmt.Errorf("sendEmail: %w", err)
+		}
+		out += topAlbumsOut + "\n\n"
 
-	start = time.Date(now.Year()-3, now.Month(), 1, 0, 0, 0, 0, now.Location())
-	end = start.AddDate(0, 1, 0)
-	out += fmt.Sprintf("Top albums for %s:\n", start.Format("2006-01"))
-	topAlbumsOut, err = topAlbumsAnalyzer.GetResults(dbPath, 20, start, end)
-	if err != nil {
-		return fmt.Errorf("sendEmail: %w", err)
+		start = time.Date(now.Year()-3, now.Month(), 1, 0, 0, 0, 0, now.Location())
+		end = start.AddDate(0, 1, 0)
+		out += fmt.Sprintf("%s for %s:\n", action.GetName(), start.Format("2006-01"))
+		topAlbumsOut, err = action.GetResults(dbPath, 20, start, end)
+		if err != nil {
+			return fmt.Errorf("sendEmail: %w", err)
+		}
+		out += topAlbumsOut + "\n\n"
 	}
-	out += topAlbumsOut + "\n\n"
 
 	if dryRun {
 		fmt.Printf("Would have sent email: \n%s\n", out)
 	} else {
 		from := mail.NewEmail("last-fm-tools", fromAddress)
-		subject := fmt.Sprintf("Listening report for %s", start.Format("2006-01"))
+		subject := fmt.Sprintf("Listening report for %s", now.Format("2006-01"))
 		to := mail.NewEmail(args[0], args[0])
-		message := mail.NewSingleEmail(from, subject, to, topAlbumsOut, fmt.Sprintf("<pre>%s</pre>", out))
+		message := mail.NewSingleEmail(from, subject, to, out, fmt.Sprintf("<pre>%s</pre>", out))
 		client := sendgrid.NewSendClient(viper.GetString("sendgrid_api_key"))
-		_, err = client.Send(message)
+		_, err := client.Send(message)
 		if err != nil {
 			return fmt.Errorf("sendEmail: %w", err)
 		}

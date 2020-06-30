@@ -19,4 +19,6 @@ import "time"
 
 type Analyser interface {
 	GetResults(dbPath string, numToReturn int, start time.Time, end time.Time) (string, error)
+
+	GetName() string
 }

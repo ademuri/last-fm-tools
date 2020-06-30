@@ -17,6 +17,6 @@ git pull
 for i in ${!users[@]}; do
   echo "Updating database for ${users[$i]}"
   bazel run //:last-fm-tools -- update --user "${users[$i]}"
-  bazel run //:last-fm-tools -- email "${emails[$i]}" --user "${users[$i]}"
+  bazel run //:last-fm-tools -- email "${emails[$i]}" top-artists new-artists --user "${users[$i]}"
 done
 

@@ -58,6 +58,10 @@ type AlbumCount struct {
 type NewAlbumsAnalyzer struct {
 }
 
+func (t NewAlbumsAnalyzer) GetName() string {
+	return "New albums"
+}
+
 func init() {
 	rootCmd.AddCommand(newAlbumsCmd)
 
