@@ -138,7 +138,7 @@ func updateDatabase(dbPath string, force bool) error {
 		if !after.IsZero() && oldestDate.Before(after) {
 			break
 		}
-		if page >= pages {
+		if page > pages {
 			break
 		}
 		if !force && oldestDate.Before(latestListen.AddDate(0, 0, -7)) {
