@@ -47,3 +47,11 @@ CREATE TABLE Listen (
   FOREIGN KEY (user) REFERENCES User(name)
 );
 CREATE INDEX idx_listen_exact ON Listen (user, date, track);
+
+CREATE TABLE Report (
+  name TEXT,
+  user TEXT,
+  sent DATETIME,
+  FOREIGN KEY (user) REFERENCES User(name),
+  CONSTRAINT PK_Report PRIMARY KEY (name, user)
+)

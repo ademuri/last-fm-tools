@@ -16,19 +16,23 @@ limitations under the License.
 
 package cmd
 
-import "testing"
+import (
+	"os"
+	"testing"
+)
 
 const (
 	user = "testuser"
 )
 
 func TestCreateDatabaseAndData(t *testing.T) {
-	db, err := createDatabase()
+	dbPath := os.Getenv("TEST_TMPDIR") + "/lastfm.db"
+	db, err := createDatabase(dbPath)
 	if err != nil {
-		t.Fatalf("createDatabase() error: %w", err)
+		t.Fatalf("createDatabase(%s) error: %w", dbPath, err)
 	}
 	if db == nil {
-		t.Fatalf("createDatabase() returned nil")
+		t.Fatalf("createDatabase(%s) returned nil", dbPath)
 	}
 
 	user := "testuser"

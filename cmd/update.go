@@ -43,7 +43,7 @@ var updateCmd = &cobra.Command{
 	Short: "Fetches data from last.fm",
 	Long:  `Stores data in a local SQLite database.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		err := updateDatabase(force)
+		err := updateDatabase(viper.GetString("database"), force)
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)
@@ -58,7 +58,7 @@ func init() {
 	updateCmd.Flags().BoolVarP(&force, "force", "f", false, "Get all listening data, regardless of what's already present (idempotent)")
 }
 
-func updateDatabase(force bool) error {
+func updateDatabase(dbPath string, force bool) error {
 	var after time.Time
 	var err error
 	if len(afterString) > 0 {
@@ -69,7 +69,7 @@ func updateDatabase(force bool) error {
 	}
 
 	user := strings.ToLower(viper.GetString("user"))
-	database, err := createDatabase()
+	database, err := createDatabase(dbPath)
 	if err != nil {
 		return fmt.Errorf("updateDatabase: %w", err)
 	}
@@ -152,8 +152,8 @@ func updateDatabase(force bool) error {
 	return nil
 }
 
-func createDatabase() (*sql.DB, error) {
-	database, err := sql.Open("sqlite3", viper.GetString("database"))
+func createDatabase(dbPath string) (*sql.DB, error) {
+	database, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
 		return nil, fmt.Errorf("createDatabase: %w", err)
 	}
