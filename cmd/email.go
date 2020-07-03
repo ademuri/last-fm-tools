@@ -71,6 +71,7 @@ func sendEmail(dbPath string, fromAddress string, dryRun bool, reportName string
 
 	now := time.Now()
 	user := viper.GetString("user")
+	toAddress := args[0]
 
 	if len(runDay) > 0 {
 		runDayNumber, err := strconv.Atoi(runDay)
@@ -85,7 +86,7 @@ func sendEmail(dbPath string, fromAddress string, dryRun bool, reportName string
 		if err != nil {
 			return fmt.Errorf("Checking last run: %w", err)
 		}
-		sentQuery, err := db.Query("SELECT sent FROM Report WHERE user = ? AND name = ?", user, reportName)
+		sentQuery, err := db.Query("SELECT sent FROM Report WHERE user = ? AND name = ? AND email = ?", user, reportName, toAddress)
 		if sentQuery.Next() {
 			var sent time.Time
 			sentQuery.Scan(&sent)
@@ -162,7 +163,7 @@ func sendEmail(dbPath string, fromAddress string, dryRun bool, reportName string
 		}
 		subject := fmt.Sprintf("Listening report for %s%s", now.Format("2006-01"), subjectSuffix)
 
-		to := mail.NewEmail(args[0], args[0])
+		to := mail.NewEmail(toAddress, toAddress)
 		message := mail.NewSingleEmail(from, subject, to, out, fmt.Sprintf("<pre>%s</pre>", out))
 		client := sendgrid.NewSendClient(viper.GetString("sendgrid_api_key"))
 		_, err := client.Send(message)
@@ -176,7 +177,7 @@ func sendEmail(dbPath string, fromAddress string, dryRun bool, reportName string
 		if err != nil {
 			return fmt.Errorf("Recording last run: %w", err)
 		}
-		_, err = db.Exec("REPLACE INTO Report(user, name, sent) VALUES (?, ?, ?)", user, reportName, now)
+		_, err = db.Exec("REPLACE INTO Report(user, name, email, sent) VALUES (?, ?, ?, ?)", user, reportName, toAddress, now)
 		if err != nil {
 			return fmt.Errorf("Recording last run: %w", err)
 		}

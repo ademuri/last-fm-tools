@@ -51,7 +51,8 @@ CREATE INDEX idx_listen_exact ON Listen (user, date, track);
 CREATE TABLE Report (
   name TEXT,
   user TEXT,
+  email TEXT,
   sent DATETIME,
   FOREIGN KEY (user) REFERENCES User(name),
-  CONSTRAINT PK_Report PRIMARY KEY (name, user)
+  CONSTRAINT PK_Report PRIMARY KEY (name, user, email)
 )
