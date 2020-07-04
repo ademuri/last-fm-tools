@@ -127,7 +127,7 @@ func sendEmail(dbPath string, fromAddress string, dryRun bool, reportName string
 	for _, action := range actions {
 		start := time.Date(now.Year()-1, now.Month(), 1, 0, 0, 0, 0, now.Location())
 		end := start.AddDate(0, 1, 0)
-		out += fmt.Sprintf("%s for %s:\n", action.GetName(), start.Format("2006-01"))
+		out += fmt.Sprintf("%s for %s %s:\n", action.GetName(), user, start.Format("2006-01"))
 		topAlbumsOut, err := action.GetResults(dbPath, 20, start, end)
 		if err != nil {
 			return fmt.Errorf("sendEmail: %w", err)
@@ -136,7 +136,7 @@ func sendEmail(dbPath string, fromAddress string, dryRun bool, reportName string
 
 		start = time.Date(now.Year()-2, now.Month(), 1, 0, 0, 0, 0, now.Location())
 		end = start.AddDate(0, 1, 0)
-		out += fmt.Sprintf("%s for %s:\n", action.GetName(), start.Format("2006-01"))
+		out += fmt.Sprintf("%s for %s %s:\n", action.GetName(), user, start.Format("2006-01"))
 		topAlbumsOut, err = action.GetResults(dbPath, 20, start, end)
 		if err != nil {
 			return fmt.Errorf("sendEmail: %w", err)
@@ -145,7 +145,7 @@ func sendEmail(dbPath string, fromAddress string, dryRun bool, reportName string
 
 		start = time.Date(now.Year()-3, now.Month(), 1, 0, 0, 0, 0, now.Location())
 		end = start.AddDate(0, 1, 0)
-		out += fmt.Sprintf("%s for %s:\n", action.GetName(), start.Format("2006-01"))
+		out += fmt.Sprintf("%s for %s %s:\n", action.GetName(), user, start.Format("2006-01"))
 		topAlbumsOut, err = action.GetResults(dbPath, 20, start, end)
 		if err != nil {
 			return fmt.Errorf("sendEmail: %w", err)
@@ -153,15 +153,16 @@ func sendEmail(dbPath string, fromAddress string, dryRun bool, reportName string
 		out += topAlbumsOut + "\n\n"
 	}
 
+	subjectSuffix := ""
+	if len(reportName) > 0 {
+		subjectSuffix = ": " + reportName
+	}
+	subject := fmt.Sprintf("Listening report for %s %s%s", user, now.Format("2006-01"), subjectSuffix)
+
 	if dryRun {
-		fmt.Printf("Would have sent email: \n%s\n", out)
+		fmt.Printf("Would have sent email: \nsubject: %s\n%s\n", subject, out)
 	} else {
 		from := mail.NewEmail("last-fm-tools", fromAddress)
-		subjectSuffix := ""
-		if len(reportName) > 0 {
-			subjectSuffix = ": " + reportName
-		}
-		subject := fmt.Sprintf("Listening report for %s%s", now.Format("2006-01"), subjectSuffix)
 
 		to := mail.NewEmail(toAddress, toAddress)
 		message := mail.NewSingleEmail(from, subject, to, out, fmt.Sprintf("<pre>%s</pre>", out))
