@@ -100,3 +100,9 @@ def go_repositories():
         sum = "h1:ZSvuHv7JuLnC9iaDubK7iNCfmR4vt8tcbuzsAYQUumo=",
         version = "v3.6.0+incompatible",
     )
+    go_repository(
+        name = "com_github_ademuri_lastfm_go",
+        importpath = "github.com/ademuri/lastfm-go",
+        sum = "h1:H28NRPPrRABhj/6c/GnuJX63oaySrC+FTq4emwF5TEA=",
+        version = "v0.0.0-20200704180735-3661b99c9dec",
+    )

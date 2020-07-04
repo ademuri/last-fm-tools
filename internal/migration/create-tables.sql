@@ -35,7 +35,8 @@ CREATE INDEX idx_track_by_metadata ON Track (artist, album);
 
 CREATE TABLE User (
   name TEXT PRIMARY KEY,
-  email TEXT
+  email TEXT,
+  session_key TEXT
 );
 
 CREATE TABLE Listen (

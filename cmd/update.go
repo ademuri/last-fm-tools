@@ -30,8 +30,8 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/ademuri/last-fm-tools/internal/migration"
+	"github.com/ademuri/lastfm-go/lastfm"
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/shkh/lastfm-go/lastfm"
 )
 
 var afterString string
@@ -80,6 +80,11 @@ func updateDatabase(dbPath string, force bool) error {
 	err = createUser(database, user)
 	if err != nil {
 		return fmt.Errorf("updateDatabase: %w", err)
+	}
+
+	err = setSessionKeyIfPresent(database, lastfm_client, user)
+	if err != nil {
+		return err
 	}
 
 	latestListen, err := getLatestListen(database, user)
@@ -193,6 +198,24 @@ func createUser(db *sql.DB, user string) error {
 			return fmt.Errorf("createUser(%q): %w", user, err)
 		}
 	}
+	return nil
+}
+
+func setSessionKeyIfPresent(db *sql.DB, lastfmClient *lastfm.Api, user string) error {
+	sessionKeyQuery, err := db.Query("SELECT session_key FROM User WHERE name = ? AND session_key <> ''", user)
+	if err != nil {
+		return fmt.Errorf("Querying session key for user: %w", err)
+	}
+	if sessionKeyQuery.Next() {
+		var sessionKey string
+		err = sessionKeyQuery.Scan(&sessionKey)
+		if err != nil {
+			return fmt.Errorf("Scanning sessionKey from query: %w", err)
+		}
+		lastfmClient.SetSession(sessionKey)
+		fmt.Printf("Using session key for user %q\n", user)
+	}
+	sessionKeyQuery.Close()
 	return nil
 }
 
