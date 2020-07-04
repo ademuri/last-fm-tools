@@ -75,6 +75,7 @@ func updateDatabase(dbPath string, force bool) error {
 	}
 
 	lastfm_client := lastfm.New(lastFmApiKey, lastFmSecret)
+	lastfm_client.SetUserAgent("last-fm-tools/1.0")
 
 	err = createUser(database, user)
 	if err != nil {
