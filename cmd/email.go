@@ -96,7 +96,7 @@ func sendEmail(dbPath string, fromAddress string, dryRun bool, reportName string
 				fmt.Printf("Report was already sent this month on %s, not sending.\n", sent.Format("2006-01-02"))
 				return nil
 			}
-			if now.After(toSendThisMonth) && sent.After(toSendLastMonth) {
+			if now.Before(toSendThisMonth) && sent.After(toSendLastMonth) {
 				fmt.Printf("Report was already sent for last month on %s, not sending.\n", sent.Format("2006-01-02"))
 				return nil
 			}
