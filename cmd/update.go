@@ -82,6 +82,17 @@ func updateDatabase(dbPath string, force bool) error {
 		return fmt.Errorf("updateDatabase: %w", err)
 	}
 
+	lastUpdated, err := getLastUpdated(database, user)
+	if err != nil {
+		return err
+	}
+	now := time.Now()
+	if now.Sub(lastUpdated).Hours() < 24 && !force {
+		fmt.Printf("User data was already updated in the past 24 hours\n")
+		return nil
+	}
+	fmt.Printf("User data was last updated: %s\n", lastUpdated.Format("2006-01-02"))
+
 	err = setSessionKeyIfPresent(database, lastfm_client, user)
 	if err != nil {
 		return err
@@ -91,7 +102,7 @@ func updateDatabase(dbPath string, force bool) error {
 	if err != nil {
 		return fmt.Errorf("updateDatabase: %w", err)
 	}
-	fmt.Printf("Latest local listening data is from %s\n", latestListen.Format("2006-01-02"))
+	fmt.Printf("Latest local listening data is from: %s\n", latestListen.Format("2006-01-02"))
 
 	fmt.Printf("Updating database for %q\n", user)
 	limiter := rate.NewLimiter(rate.Every(1*time.Second), 1)
@@ -153,6 +164,11 @@ func updateDatabase(dbPath string, force bool) error {
 		}
 
 		limiter.Wait(context.Background())
+	}
+
+	err = setLastUpdated(database, user, now)
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -350,4 +366,28 @@ func getLatestListen(db *sql.DB, user string) (date time.Time, err error) {
 
 	query.Scan(&date)
 	return
+}
+
+func getLastUpdated(db *sql.DB, user string) (date time.Time, err error) {
+	query, err := db.Query("SELECT last_updated FROM User WHERE name = ?", user)
+	if err != nil {
+		err = fmt.Errorf("getLastUpdated(%q): %w", user, err)
+		return
+	}
+	defer query.Close()
+
+	if !query.Next() {
+		return
+	}
+
+	query.Scan(&date)
+	return
+}
+
+func setLastUpdated(db *sql.DB, user string, updated time.Time) error {
+	_, err := db.Exec("UPDATE User SET last_updated = ? WHERE name = ?", updated, user)
+	if err != nil {
+		return fmt.Errorf("setLastUpdated(%q, %q): %w", user, updated, err)
+	}
+	return nil
 }
