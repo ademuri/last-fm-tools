@@ -18,7 +18,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/sendgrid/sendgrid-go"
@@ -27,6 +26,16 @@ import (
 	"github.com/spf13/viper"
 )
 
+type SendEmailConfig struct {
+	DbPath     string
+	User       string
+	From       string
+	To         string
+	ReportName string
+	Types      []string
+	DryRun     bool
+}
+
 var emailCmd = &cobra.Command{
 	Use:   "email <address> <analysis_name...>",
 	Short: "Sends an email report",
@@ -34,7 +43,16 @@ var emailCmd = &cobra.Command{
   <analysis_name> is one or more of: top-artists, top-albums, new-artists, new-albums`,
 	Args: cobra.MinimumNArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
-		err := sendEmail(viper.GetString("database"), viper.GetString("from"), viper.GetBool("dry_run"), viper.GetString("name"), viper.GetString("run_day"), args)
+		config := SendEmailConfig{
+			DbPath:     viper.GetString("database"),
+			User:       viper.GetString("user"),
+			From:       viper.GetString("from"),
+			To:         args[0],
+			ReportName: viper.GetString("name"),
+			Types:      args[1:],
+			DryRun:     viper.GetBool("dry_run"),
+		}
+		err := sendEmail(config)
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)
@@ -49,75 +67,26 @@ func init() {
 	// https://sendgrid.com/docs/for-developers/sending-email/sender-identity/
 	var from string
 	emailCmd.Flags().StringVar(&from, "from", "", "From email address")
+	emailCmd.MarkFlagRequired("from")
 	viper.BindPFlag("from", emailCmd.Flags().Lookup("from"))
+
+	var email string
+	emailCmd.Flags().StringVar(&email, "to", "", "Destination email address")
+	emailCmd.MarkFlagRequired("to")
+	viper.BindPFlag("to", emailCmd.Flags().Lookup("to"))
 
 	var dryRun bool
 	emailCmd.Flags().BoolVarP(&dryRun, "dry_run", "n", false, "When true, just print instead of emailing")
 	viper.BindPFlag("dry_run", emailCmd.Flags().Lookup("dry_run"))
-
-	var reportName string
-	emailCmd.Flags().StringVar(&reportName, "name", "", "Report name - included in the email title, and used for periodically sending")
-	viper.BindPFlag("name", emailCmd.Flags().Lookup("name"))
-
-	var runDay string
-	emailCmd.Flags().StringVar(&runDay, "run_day", "", "Which day of the month to run this report on")
-	viper.BindPFlag("run_day", emailCmd.Flags().Lookup("run_day"))
 }
 
-func sendEmail(dbPath string, fromAddress string, dryRun bool, reportName string, runDay string, args []string) error {
-	if len(runDay) > 0 && len(reportName) == 0 {
-		return fmt.Errorf("When specifying --run_day, you must also specify --name")
-	}
-
+func sendEmail(config SendEmailConfig) error {
 	now := time.Now()
-	user := viper.GetString("user")
-	toAddress := args[0]
 
-	if len(runDay) > 0 {
-		runDayNumber, err := strconv.Atoi(runDay)
-		if err != nil {
-			return fmt.Errorf("Parsing runDay: %w", err)
-		}
-		if runDayNumber < 0 || runDayNumber > 31 {
-			return fmt.Errorf("runDay out of range: %d", runDayNumber)
-		}
-
-		db, err := createDatabase(dbPath)
-		if err != nil {
-			return fmt.Errorf("Checking last run: %w", err)
-		}
-		sentQuery, err := db.Query("SELECT sent FROM Report WHERE user = ? AND name = ? AND email = ?", user, reportName, toAddress)
-		if sentQuery.Next() {
-			var sent time.Time
-			sentQuery.Scan(&sent)
-			toSendThisMonth := time.Date(now.Year(), now.Month(), runDayNumber, 0, 0, 0, 0, now.Location())
-			toSendLastMonth := time.Date(now.Year(), now.Month()-1, runDayNumber, 0, 0, 0, 0, now.Location())
-			if sent.After(toSendThisMonth) {
-				fmt.Printf("Report was already sent this month on %s, not sending.\n", sent.Format("2006-01-02"))
-				return nil
-			}
-			if now.Before(toSendThisMonth) && sent.After(toSendLastMonth) {
-				fmt.Printf("Report was already sent for last month on %s, not sending.\n", sent.Format("2006-01-02"))
-				return nil
-			}
-		} else {
-			fmt.Println("No previous runs, running now...")
-		}
-
-		sentQuery.Close()
-		db.Close()
-	}
-
-	actionMap := map[string]Analyser{
-		"top-artists": TopArtistsAnalyzer{},
-		"top-albums":  TopAlbumsAnalyzer{},
-		"new-artists": NewArtistsAnalyzer{},
-		"new-albums":  NewAlbumsAnalyzer{},
-	}
 	actions := make([]Analyser, 0)
-	for _, actionName := range args[1:] {
-		action, ok := actionMap[actionName]
-		if !ok {
+	for _, actionName := range config.Types {
+		action, err := getActionFromName(actionName)
+		if err != nil {
 			return fmt.Errorf("Invalid analysis_name: %s", actionName)
 		}
 		actions = append(actions, action)
@@ -127,8 +96,8 @@ func sendEmail(dbPath string, fromAddress string, dryRun bool, reportName string
 	for _, action := range actions {
 		start := time.Date(now.Year()-1, now.Month(), 1, 0, 0, 0, 0, now.Location())
 		end := start.AddDate(0, 1, 0)
-		out += fmt.Sprintf("%s for %s %s:\n", action.GetName(), user, start.Format("2006-01"))
-		topAlbumsOut, err := action.GetResults(dbPath, 20, start, end)
+		out += fmt.Sprintf("%s for %s %s:\n", action.GetName(), config.User, start.Format("2006-01"))
+		topAlbumsOut, err := action.GetResults(config.DbPath, 20, start, end)
 		if err != nil {
 			return fmt.Errorf("sendEmail: %w", err)
 		}
@@ -136,8 +105,8 @@ func sendEmail(dbPath string, fromAddress string, dryRun bool, reportName string
 
 		start = time.Date(now.Year()-2, now.Month(), 1, 0, 0, 0, 0, now.Location())
 		end = start.AddDate(0, 1, 0)
-		out += fmt.Sprintf("%s for %s %s:\n", action.GetName(), user, start.Format("2006-01"))
-		topAlbumsOut, err = action.GetResults(dbPath, 20, start, end)
+		out += fmt.Sprintf("%s for %s %s:\n", action.GetName(), config.User, start.Format("2006-01"))
+		topAlbumsOut, err = action.GetResults(config.DbPath, 20, start, end)
 		if err != nil {
 			return fmt.Errorf("sendEmail: %w", err)
 		}
@@ -145,8 +114,8 @@ func sendEmail(dbPath string, fromAddress string, dryRun bool, reportName string
 
 		start = time.Date(now.Year()-3, now.Month(), 1, 0, 0, 0, 0, now.Location())
 		end = start.AddDate(0, 1, 0)
-		out += fmt.Sprintf("%s for %s %s:\n", action.GetName(), user, start.Format("2006-01"))
-		topAlbumsOut, err = action.GetResults(dbPath, 20, start, end)
+		out += fmt.Sprintf("%s for %s %s:\n", action.GetName(), config.User, start.Format("2006-01"))
+		topAlbumsOut, err = action.GetResults(config.DbPath, 20, start, end)
 		if err != nil {
 			return fmt.Errorf("sendEmail: %w", err)
 		}
@@ -154,17 +123,17 @@ func sendEmail(dbPath string, fromAddress string, dryRun bool, reportName string
 	}
 
 	subjectSuffix := ""
-	if len(reportName) > 0 {
-		subjectSuffix = ": " + reportName
+	if len(config.ReportName) > 0 {
+		subjectSuffix = ": " + config.ReportName
 	}
-	subject := fmt.Sprintf("Listening report for %s %s%s", user, now.Format("2006-01"), subjectSuffix)
+	subject := fmt.Sprintf("Listening report for %s %s%s", config.User, now.Format("2006-01"), subjectSuffix)
 
-	if dryRun {
+	if config.DryRun {
 		fmt.Printf("Would have sent email: \nsubject: %s\n%s\n", subject, out)
 	} else {
-		from := mail.NewEmail("last-fm-tools", fromAddress)
+		from := mail.NewEmail("last-fm-tools", config.From)
 
-		to := mail.NewEmail(toAddress, toAddress)
+		to := mail.NewEmail(config.To, config.To)
 		message := mail.NewSingleEmail(from, subject, to, out, fmt.Sprintf("<pre>%s</pre>", out))
 		client := sendgrid.NewSendClient(viper.GetString("sendgrid_api_key"))
 		_, err := client.Send(message)
@@ -173,12 +142,12 @@ func sendEmail(dbPath string, fromAddress string, dryRun bool, reportName string
 		}
 	}
 
-	if len(reportName) > 0 {
-		db, err := createDatabase(dbPath)
+	if len(config.ReportName) > 0 {
+		db, err := createDatabase(config.DbPath)
 		if err != nil {
 			return fmt.Errorf("Recording last run: %w", err)
 		}
-		_, err = db.Exec("REPLACE INTO Report(user, name, email, sent) VALUES (?, ?, ?, ?)", user, reportName, toAddress, now)
+		_, err = db.Exec("UPDATE Report SET sent = ? WHERE user = ? AND name = ? AND email = ?", now, config.User, config.ReportName, config.To)
 		if err != nil {
 			return fmt.Errorf("Recording last run: %w", err)
 		}
@@ -186,4 +155,20 @@ func sendEmail(dbPath string, fromAddress string, dryRun bool, reportName string
 	}
 
 	return nil
+}
+
+func getActionFromName(actionName string) (Analyser, error) {
+	actionMap := map[string]Analyser{
+		"top-artists": TopArtistsAnalyzer{},
+		"top-albums":  TopAlbumsAnalyzer{},
+		"new-artists": NewArtistsAnalyzer{},
+		"new-albums":  NewAlbumsAnalyzer{},
+	}
+
+	action, ok := actionMap[actionName]
+	if !ok {
+		return nil, fmt.Errorf("Invalid analysis_name: %s", actionName)
+	}
+
+	return action, nil
 }

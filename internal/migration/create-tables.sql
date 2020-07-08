@@ -55,6 +55,8 @@ CREATE TABLE Report (
   user TEXT,
   email TEXT,
   sent DATETIME,
+  run_day INTEGER,
+  types TEXT,
   FOREIGN KEY (user) REFERENCES User(name),
   CONSTRAINT PK_Report PRIMARY KEY (name, user, email)
 )

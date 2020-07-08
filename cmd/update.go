@@ -34,8 +34,12 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-var afterString string
-var force bool
+type UpdateConfig struct {
+	DbPath string
+	User   string
+	After  string
+	Force  bool
+}
 
 // updateCmd represents the update command
 var updateCmd = &cobra.Command{
@@ -43,7 +47,14 @@ var updateCmd = &cobra.Command{
 	Short: "Fetches data from last.fm",
 	Long:  `Stores data in a local SQLite database.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		err := updateDatabase(viper.GetString("database"), force)
+		config := UpdateConfig{
+			DbPath: viper.GetString("database"),
+			User:   viper.GetString("user"),
+			After:  viper.GetString("after"),
+			Force:  viper.GetBool("user"),
+		}
+
+		err := updateDatabase(config)
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)
@@ -54,22 +65,27 @@ var updateCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(updateCmd)
 
+	var afterString string
 	updateCmd.Flags().StringVar(&afterString, "after", "", "Only get listening data after this date, in yyyy-mm-dd format")
+	viper.BindPFlag("after", updateCmd.Flags().Lookup("after"))
+
+	var force bool
 	updateCmd.Flags().BoolVarP(&force, "force", "f", false, "Get all listening data, regardless of what's already present (idempotent)")
+	viper.BindPFlag("force", updateCmd.Flags().Lookup("force"))
 }
 
-func updateDatabase(dbPath string, force bool) error {
+func updateDatabase(config UpdateConfig) error {
 	var after time.Time
 	var err error
-	if len(afterString) > 0 {
-		after, err = time.Parse("2006-01-02", afterString)
+	if len(config.After) > 0 {
+		after, err = time.Parse("2006-01-02", config.After)
 		if err != nil {
 			return fmt.Errorf("--after: %w", err)
 		}
 	}
 
-	user := strings.ToLower(viper.GetString("user"))
-	database, err := createDatabase(dbPath)
+	user := strings.ToLower(config.User)
+	database, err := createDatabase(config.DbPath)
 	if err != nil {
 		return fmt.Errorf("updateDatabase: %w", err)
 	}
@@ -87,7 +103,7 @@ func updateDatabase(dbPath string, force bool) error {
 		return err
 	}
 	now := time.Now()
-	if now.Sub(lastUpdated).Hours() < 24 && !force {
+	if now.Sub(lastUpdated).Hours() < 24 && !config.Force {
 		fmt.Printf("User data was already updated in the past 24 hours\n")
 		return nil
 	}
@@ -158,7 +174,7 @@ func updateDatabase(dbPath string, force bool) error {
 		if page > pages {
 			break
 		}
-		if !force && oldestDate.Before(latestListen.AddDate(0, 0, -7)) {
+		if !config.Force && oldestDate.Before(latestListen.AddDate(0, 0, -7)) {
 			fmt.Println("Refreshed back to existing data")
 			break
 		}

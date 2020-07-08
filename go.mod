@@ -4,6 +4,7 @@ go 1.14
 
 require (
 	github.com/PuerkitoBio/goquery v1.5.1 // indirect
+	github.com/ademuri/lastfm-go v0.0.0-20200704180735-3661b99c9dec
 	github.com/andybalholm/cascadia v1.2.0 // indirect
 	github.com/avast/retry-go v2.6.0+incompatible
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
@@ -14,7 +15,6 @@ require (
 	github.com/pelletier/go-toml v1.8.0 // indirect
 	github.com/sendgrid/rest v2.6.0+incompatible // indirect
 	github.com/sendgrid/sendgrid-go v3.6.0+incompatible
-	github.com/ademuri/lastfm-go 3661b99c9dec3788684292ce163617326b214cc6
 	github.com/spf13/afero v1.2.2 // indirect
 	github.com/spf13/cast v1.3.1 // indirect
 	github.com/spf13/cobra v1.0.0
