@@ -114,6 +114,19 @@ func sendReports(config SendReportsConfig) error {
 
 	errOccurred := false
 	for _, emailConfig := range emailConfigs {
+		if !config.DryRun {
+			updateConfig := UpdateConfig{
+				DbPath: config.DbPath,
+				User:   emailConfig.User,
+			}
+
+			err = updateDatabase(updateConfig)
+			if err != nil {
+				errOccurred = true
+				fmt.Printf("updateDatabase(%q): %w", emailConfig.User, err)
+			}
+		}
+
 		fmt.Printf("Sending report (%q, %q)\n", emailConfig.User, emailConfig.ReportName)
 		err := sendEmail(emailConfig)
 		if err != nil {
