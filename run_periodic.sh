@@ -11,4 +11,5 @@ fi
 cd last-fm-tools
 git pull
 
-bazel run //:last-fm-tools -- send-reports
+# Note: must specify `user`, even though it's not used
+bazel run //:last-fm-tools -- send-reports --user notuser

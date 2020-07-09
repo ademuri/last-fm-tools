@@ -80,6 +80,13 @@ func init() {
 
 	rootCmd.PersistentFlags().StringVar(&sendgridApiKey, "sendgrid_api_key", "", "SendGrid API key, for sending email reports")
 	viper.BindPFlag("sendgrid_api_key", rootCmd.PersistentFlags().Lookup("sendgrid_api_key"))
+
+	// Note: you'll need to set up sender identity verification
+	// https://sendgrid.com/docs/for-developers/sending-email/sender-identity/
+	var from string
+	rootCmd.PersistentFlags().StringVar(&from, "from", "", "From email address")
+	rootCmd.MarkPersistentFlagRequired("from")
+	viper.BindPFlag("from", rootCmd.PersistentFlags().Lookup("from"))
 }
 
 // initConfig reads in config file and ENV variables if set.

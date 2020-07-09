@@ -53,11 +53,6 @@ var sendReportsCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(sendReportsCmd)
 
-	var from string
-	sendReportsCmd.Flags().StringVar(&from, "from", "", "From email address")
-	sendReportsCmd.MarkFlagRequired("from")
-	viper.BindPFlag("from", sendReportsCmd.Flags().Lookup("from"))
-
 	var dryRun bool
 	sendReportsCmd.Flags().BoolVarP(&dryRun, "dry_run", "n", false, "When true, just print instead of emailing")
 	viper.BindPFlag("dry_run", sendReportsCmd.Flags().Lookup("dry_run"))

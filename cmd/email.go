@@ -63,13 +63,6 @@ var emailCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(emailCmd)
 
-	// Note: you'll need to set up sender identity verification
-	// https://sendgrid.com/docs/for-developers/sending-email/sender-identity/
-	var from string
-	emailCmd.Flags().StringVar(&from, "from", "", "From email address")
-	emailCmd.MarkFlagRequired("from")
-	viper.BindPFlag("from", emailCmd.Flags().Lookup("from"))
-
 	var email string
 	emailCmd.Flags().StringVar(&email, "to", "", "Destination email address")
 	emailCmd.MarkFlagRequired("to")
