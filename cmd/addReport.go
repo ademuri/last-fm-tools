@@ -62,7 +62,7 @@ func init() {
 }
 
 func addReport(dbPath string, name string, user string, to string, runDay int, types []string) error {
-	if runDay < 0 || runDay > 31 {
+	if runDay < 1 || runDay > 31 {
 		return fmt.Errorf("run_day out of range: %d", runDay)
 	}
 
