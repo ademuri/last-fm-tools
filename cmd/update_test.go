@@ -17,6 +17,8 @@ limitations under the License.
 package cmd
 
 import (
+	"database/sql"
+	"fmt"
 	"os"
 	"testing"
 )
@@ -25,14 +27,35 @@ const (
 	user = "testuser"
 )
 
-func TestCreateDatabaseAndData(t *testing.T) {
-	dbPath := os.Getenv("TEST_TMPDIR") + "/lastfm.db"
+func getTestDbPath() string {
+	return os.Getenv("TEST_TMPDIR") + "/lastfm.db"
+}
+
+func createTestDb() (*sql.DB, error) {
+	dbPath := getTestDbPath()
+	// Delete the database if it already exists
+	if _, err := os.Stat(dbPath); err == nil {
+		err = os.Remove(dbPath)
+		if err != nil {
+			return nil, fmt.Errorf("Deleting previous database: %w", err)
+		}
+	}
+
 	db, err := createDatabase(dbPath)
 	if err != nil {
-		t.Fatalf("createDatabase(%s) error: %w", dbPath, err)
+		return nil, fmt.Errorf("createDatabase(%s) error: %w", dbPath, err)
 	}
 	if db == nil {
-		t.Fatalf("createDatabase(%s) returned nil", dbPath)
+		return nil, fmt.Errorf("createDatabase(%s) returned nil", dbPath)
+	}
+
+	return db, nil
+}
+
+func TestCreateDatabaseAndData(t *testing.T) {
+	db, err := createTestDb()
+	if err != nil {
+		t.Fatalf("createTestDb() error: %w", err)
 	}
 
 	user := "testuser"
