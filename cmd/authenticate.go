@@ -21,9 +21,9 @@ import (
 	"os"
 	"strings"
 
+	"github.com/ademuri/lastfm-go/lastfm"
 	"github.com/sendgrid/sendgrid-go"
 	"github.com/sendgrid/sendgrid-go/helpers/mail"
-	"github.com/shkh/lastfm-go/lastfm"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
