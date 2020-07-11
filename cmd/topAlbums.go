@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/olekukonko/tablewriter"
@@ -52,7 +51,7 @@ func init() {
 func printTopAlbums(dbPath string, numToReturn int, args []string) error {
 	start, end, err := parseDateRangeFromArgs(args)
 
-	out, err := TopAlbumsAnalyzer{}.GetResults(dbPath, numToReturn, start, end)
+	out, err := TopAlbumsAnalyzer{}.GetResults(dbPath, viper.GetString("user"), numToReturn, start, end)
 	if err != nil {
 		return err
 	}
@@ -67,7 +66,7 @@ func (t TopAlbumsAnalyzer) GetName() string {
 	return "Top albums"
 }
 
-func (t TopAlbumsAnalyzer) GetResults(dbPath string, numToReturn int, start time.Time, end time.Time) (string, error) {
+func (t TopAlbumsAnalyzer) GetResults(dbPath string, user string, numToReturn int, start time.Time, end time.Time) (string, error) {
 	db, err := openDb(dbPath)
 	if err != nil {
 		return "", fmt.Errorf("getTopAlbums: %w", err)
@@ -80,8 +79,6 @@ func (t TopAlbumsAnalyzer) GetResults(dbPath string, numToReturn int, start time
 	if !exists {
 		return "", fmt.Errorf("Database doesn't exist - run update first.")
 	}
-
-	user := strings.ToLower(viper.GetString("user"))
 
 	const countQueryString = `
 	SELECT Track.artist, Track.album, COUNT(Listen.id)

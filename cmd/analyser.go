@@ -18,7 +18,7 @@ package cmd
 import "time"
 
 type Analyser interface {
-	GetResults(dbPath string, numToReturn int, start time.Time, end time.Time) (string, error)
+	GetResults(dbPath string, user string, numToReturn int, start time.Time, end time.Time) (string, error)
 
 	GetName() string
 }

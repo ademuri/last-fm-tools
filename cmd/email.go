@@ -90,7 +90,7 @@ func sendEmail(config SendEmailConfig) error {
 		start := time.Date(now.Year()-1, now.Month(), 1, 0, 0, 0, 0, now.Location())
 		end := start.AddDate(0, 1, 0)
 		out += fmt.Sprintf("%s for %s %s:\n", action.GetName(), config.User, start.Format("2006-01"))
-		topAlbumsOut, err := action.GetResults(config.DbPath, 20, start, end)
+		topAlbumsOut, err := action.GetResults(config.DbPath, config.User, 20, start, end)
 		if err != nil {
 			return fmt.Errorf("sendEmail: %w", err)
 		}
@@ -99,7 +99,7 @@ func sendEmail(config SendEmailConfig) error {
 		start = time.Date(now.Year()-2, now.Month(), 1, 0, 0, 0, 0, now.Location())
 		end = start.AddDate(0, 1, 0)
 		out += fmt.Sprintf("%s for %s %s:\n", action.GetName(), config.User, start.Format("2006-01"))
-		topAlbumsOut, err = action.GetResults(config.DbPath, 20, start, end)
+		topAlbumsOut, err = action.GetResults(config.DbPath, config.User, 20, start, end)
 		if err != nil {
 			return fmt.Errorf("sendEmail: %w", err)
 		}
@@ -108,7 +108,7 @@ func sendEmail(config SendEmailConfig) error {
 		start = time.Date(now.Year()-3, now.Month(), 1, 0, 0, 0, 0, now.Location())
 		end = start.AddDate(0, 1, 0)
 		out += fmt.Sprintf("%s for %s %s:\n", action.GetName(), config.User, start.Format("2006-01"))
-		topAlbumsOut, err = action.GetResults(config.DbPath, 20, start, end)
+		topAlbumsOut, err = action.GetResults(config.DbPath, config.User, 20, start, end)
 		if err != nil {
 			return fmt.Errorf("sendEmail: %w", err)
 		}

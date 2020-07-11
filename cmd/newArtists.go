@@ -22,7 +22,6 @@ import (
 	"os"
 	"sort"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/olekukonko/tablewriter"
@@ -59,7 +58,7 @@ func init() {
 func printNewArtists(dbPath string, numToReturn int, args []string) error {
 	start, end, err := parseDateRangeFromArgs(args)
 
-	out, err := NewArtistsAnalyzer{}.GetResults(dbPath, numToReturn, start, end)
+	out, err := NewArtistsAnalyzer{}.GetResults(dbPath, viper.GetString("user"), numToReturn, start, end)
 	if err != nil {
 		return err
 	}
@@ -74,7 +73,7 @@ func (t NewArtistsAnalyzer) GetName() string {
 	return "New artists"
 }
 
-func (t NewArtistsAnalyzer) GetResults(dbPath string, numToReturn int, start time.Time, end time.Time) (string, error) {
+func (t NewArtistsAnalyzer) GetResults(dbPath string, user string, numToReturn int, start time.Time, end time.Time) (string, error) {
 	db, err := openDb(dbPath)
 	if err != nil {
 		return "", fmt.Errorf("printNewArtists: %w", err)
@@ -89,7 +88,6 @@ func (t NewArtistsAnalyzer) GetResults(dbPath string, numToReturn int, start tim
 	}
 
 	out := new(bytes.Buffer)
-	user := strings.ToLower(viper.GetString("user"))
 	var zeroTime time.Time
 	prevArtists, err := getArtistsForPeriod(db, user, zeroTime, start)
 	if err != nil {
