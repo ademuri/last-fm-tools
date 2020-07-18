@@ -63,11 +63,6 @@ var emailCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(emailCmd)
 
-	var email string
-	emailCmd.Flags().StringVar(&email, "to", "", "Destination email address")
-	emailCmd.MarkFlagRequired("to")
-	viper.BindPFlag("to", emailCmd.Flags().Lookup("to"))
-
 	var dryRun bool
 	emailCmd.Flags().BoolVarP(&dryRun, "dry_run", "n", false, "When true, just print instead of emailing")
 	viper.BindPFlag("dry_run", emailCmd.Flags().Lookup("dry_run"))
@@ -85,34 +80,61 @@ func sendEmail(config SendEmailConfig) error {
 		actions = append(actions, action)
 	}
 
-	out := ""
+	out := `
+<html>
+  <head>
+<style>
+td {
+  padding: 0.1em 0.2em;
+}
+table, th, td {
+  border: 1px solid black;
+  border-collapse: collapse;
+}
+</style>
+  </head>
+  <body>
+`
 	for _, action := range actions {
-		start := time.Date(now.Year()-1, now.Month(), 1, 0, 0, 0, 0, now.Location())
-		end := start.AddDate(0, 1, 0)
-		out += fmt.Sprintf("%s for %s %s:\n", action.GetName(), config.User, start.Format("2006-01"))
-		topAlbumsOut, err := action.GetResults(config.DbPath, config.User, 20, start, end)
-		if err != nil {
-			return fmt.Errorf("sendEmail: %w", err)
-		}
-		out += topAlbumsOut + "\n\n"
+		out += `
+		<div>
+`
+		years := []int{1, 2, 3}
+		for _, year := range years {
+			start := time.Date(now.Year()-year, now.Month(), 1, 0, 0, 0, 0, now.Location())
+			end := start.AddDate(0, 1, 0)
+			out += fmt.Sprintf("<h2>%s for %s %s:</h2>\n", action.GetName(), config.User, start.Format("2006-01"))
+			analysis, err := action.GetResults(config.DbPath, config.User, 20, start, end)
+			if err != nil {
+				return fmt.Errorf("sendEmail: %w", err)
+			}
 
-		start = time.Date(now.Year()-2, now.Month(), 1, 0, 0, 0, 0, now.Location())
-		end = start.AddDate(0, 1, 0)
-		out += fmt.Sprintf("%s for %s %s:\n", action.GetName(), config.User, start.Format("2006-01"))
-		topAlbumsOut, err = action.GetResults(config.DbPath, config.User, 20, start, end)
-		if err != nil {
-			return fmt.Errorf("sendEmail: %w", err)
-		}
-		out += topAlbumsOut + "\n\n"
+			out += `
+			<table>
+				<thead>
+					<tr>
+`
+			for _, header := range analysis.results[0] {
+				out += fmt.Sprintf("<th>%s</th>", header)
+			}
+			out += `				</tr>
+			</thead>`
 
-		start = time.Date(now.Year()-3, now.Month(), 1, 0, 0, 0, 0, now.Location())
-		end = start.AddDate(0, 1, 0)
-		out += fmt.Sprintf("%s for %s %s:\n", action.GetName(), config.User, start.Format("2006-01"))
-		topAlbumsOut, err = action.GetResults(config.DbPath, config.User, 20, start, end)
-		if err != nil {
-			return fmt.Errorf("sendEmail: %w", err)
+			for _, row := range analysis.results[1:] {
+				out += "<tr>\n"
+				for _, column := range row {
+					out += fmt.Sprintf("<td>%s</td>\n", column)
+				}
+				out += "</tr>\n"
+
+			}
+			out += `
+				</tbody>
+			</table>
+`
+			out += fmt.Sprintf(`<div>%s</div>
+		</div>`, analysis.summary)
 		}
-		out += topAlbumsOut + "\n\n"
 	}
 
 	subjectSuffix := ""

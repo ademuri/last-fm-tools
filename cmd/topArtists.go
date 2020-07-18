@@ -16,13 +16,11 @@ limitations under the License.
 package cmd
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"strconv"
 	"time"
 
-	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -66,18 +64,21 @@ func (t TopArtistsAnalyzer) GetName() string {
 	return "Top artists"
 }
 
-func (t TopArtistsAnalyzer) GetResults(dbPath string, user string, numToReturn int, start time.Time, end time.Time) (string, error) {
+func (t TopArtistsAnalyzer) GetResults(dbPath string, user string, numToReturn int, start time.Time, end time.Time) (analysis Analysis, err error) {
 	db, err := openDb(dbPath)
 	if err != nil {
-		return "", fmt.Errorf("printTopArtists: %w", err)
+		err = fmt.Errorf("printTopArtists: %w", err)
+		return
 	}
 
 	exists, err := dbExists(db)
 	if err != nil {
-		return "", fmt.Errorf("printTopArtists: %w", err)
+		err = fmt.Errorf("printTopArtists: %w", err)
+		return
 	}
 	if !exists {
-		return "", fmt.Errorf("Database doesn't exist - run update first.")
+		err = fmt.Errorf("Database doesn't exist - run update first.")
+		return
 	}
 
 	const countQueryString = `
@@ -92,32 +93,32 @@ func (t TopArtistsAnalyzer) GetResults(dbPath string, user string, numToReturn i
 	`
 	countQuery, err := db.Query(countQueryString, user, start.Unix(), end.Unix())
 	if err != nil {
-		return "", fmt.Errorf("printTopArtists: %w", err)
+		err = fmt.Errorf("printTopArtists: %w", err)
+		return
 	}
 
-	out := new(bytes.Buffer)
 	numArtists := 0
 	var numListens int64 = 0
-	table := tablewriter.NewWriter(out)
-	table.SetHeader([]string{"Artist", "Listens"})
+	analysis.results = [][]string{{"Artist", "Listens"}}
 	for countQuery.Next() {
 		artist := make([]string, 2)
 		countQuery.Scan(&artist[0], &artist[1])
 		if numArtists < numToReturn {
-			table.Append(artist)
+			analysis.results = append(analysis.results, artist)
 		}
 		numArtists += 1
-		listens, err := strconv.ParseInt(artist[1], 10, 64)
+		var listens int64
+		listens, err = strconv.ParseInt(artist[1], 10, 64)
 		if err != nil {
-			return "", fmt.Errorf("counting listens: %w", err)
+			err = fmt.Errorf("counting listens: %w", err)
+			return
 		}
 		numListens += listens
 	}
-	table.Render()
 
 	const dateFormat = "2006-01-02"
-	fmt.Fprintf(out, "Found %d artists and %d listens from %s to %s\n",
+	analysis.summary = fmt.Sprintf("Found %d artists and %d listens from %s to %s\n",
 		numArtists, numListens, start.Format(dateFormat), end.Format(dateFormat))
 
-	return out.String(), nil
+	return
 }

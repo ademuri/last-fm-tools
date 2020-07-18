@@ -15,10 +15,33 @@ limitations under the License.
 */
 package cmd
 
-import "time"
+import (
+	"bytes"
+	"fmt"
+	"time"
+
+	"github.com/olekukonko/tablewriter"
+)
+
+type Analysis struct {
+	results [][]string
+	summary string
+}
 
 type Analyser interface {
-	GetResults(dbPath string, user string, numToReturn int, start time.Time, end time.Time) (string, error)
+	GetResults(dbPath string, user string, numToReturn int, start time.Time, end time.Time) (Analysis, error)
 
 	GetName() string
+}
+
+func (a Analysis) String() string {
+	out := new(bytes.Buffer)
+	table := tablewriter.NewWriter(out)
+	table.SetHeader(a.results[0])
+	for _, row := range a.results[1:] {
+		table.Append(row)
+	}
+	table.Render()
+	fmt.Fprintf(out, "%s\n", a.summary)
+	return out.String()
 }

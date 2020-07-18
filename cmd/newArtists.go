@@ -24,7 +24,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -73,29 +72,34 @@ func (t NewArtistsAnalyzer) GetName() string {
 	return "New artists"
 }
 
-func (t NewArtistsAnalyzer) GetResults(dbPath string, user string, numToReturn int, start time.Time, end time.Time) (string, error) {
+func (t NewArtistsAnalyzer) GetResults(dbPath string, user string, numToReturn int, start time.Time, end time.Time) (analysis Analysis, err error) {
 	db, err := openDb(dbPath)
 	if err != nil {
-		return "", fmt.Errorf("printNewArtists: %w", err)
+		err = fmt.Errorf("printNewArtists: %w", err)
+		return
 	}
 
 	exists, err := dbExists(db)
 	if err != nil {
-		return "", fmt.Errorf("printNewArtists: %w", err)
+		err = fmt.Errorf("printNewArtists: %w", err)
+		return
 	}
 	if !exists {
-		return "", fmt.Errorf("Database doesn't exist - run update first.")
+		err = fmt.Errorf("Database doesn't exist - run update first.")
+		return
 	}
 
 	out := new(bytes.Buffer)
 	var zeroTime time.Time
 	prevArtists, err := getArtistsForPeriod(db, user, zeroTime, start)
 	if err != nil {
-		return "", fmt.Errorf("printNewArtists: %w", err)
+		err = fmt.Errorf("printNewArtists: %w", err)
+		return
 	}
 	curArtists, err := getArtistsForPeriod(db, user, start, end)
 	if err != nil {
-		return "", fmt.Errorf("printNewArtists: %w", err)
+		err = fmt.Errorf("printNewArtists: %w", err)
+		return
 	}
 	fmt.Fprintf(out, "Got %d prev artists, %d cur artists\n", len(prevArtists), len(curArtists))
 
@@ -109,19 +113,21 @@ func (t NewArtistsAnalyzer) GetResults(dbPath string, user string, numToReturn i
 		return counts[i].Count > counts[j].Count
 	})
 
-	table := tablewriter.NewWriter(out)
-	table.SetHeader([]string{"Artist"})
+	analysis.results = append(analysis.results, []string{"Artist", "Listens"})
 	n := 0
+	var numListens int64 = 0
 	for _, count := range counts {
-		table.Append([]string{count.Artist, strconv.FormatInt(count.Count, 10)})
-		n += 1
-		if numToReturn > 0 && n > numToReturn {
-			break
+		if numToReturn == 0 || n < numToReturn {
+			analysis.results = append(analysis.results, []string{count.Artist, strconv.FormatInt(count.Count, 10)})
 		}
+		n += 1
+		numListens += count.Count
 	}
-	table.Render()
+	const dateFormat = "2006-01-02"
+	analysis.summary = fmt.Sprintf("Found %d new artists with %d listens from %s to %s\n",
+		n, numListens, start.Format(dateFormat), end.Format(dateFormat))
 
-	return out.String(), nil
+	return
 }
 
 func getArtistsForPeriod(db *sql.DB, user string, start time.Time, end time.Time) (map[string]int64, error) {

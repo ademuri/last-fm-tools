@@ -16,13 +16,11 @@ limitations under the License.
 package cmd
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"strconv"
 	"time"
 
-	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -66,18 +64,22 @@ func (t TopAlbumsAnalyzer) GetName() string {
 	return "Top albums"
 }
 
-func (t TopAlbumsAnalyzer) GetResults(dbPath string, user string, numToReturn int, start time.Time, end time.Time) (string, error) {
+func (t TopAlbumsAnalyzer) GetResults(dbPath string, user string, numToReturn int, start time.Time, end time.Time) (analysis Analysis, err error) {
+	analysis.results = make([][]string, 0)
 	db, err := openDb(dbPath)
 	if err != nil {
-		return "", fmt.Errorf("getTopAlbums: %w", err)
+		err = fmt.Errorf("getTopAlbums: %w", err)
+		return
 	}
 
 	exists, err := dbExists(db)
 	if err != nil {
-		return "", fmt.Errorf("getTopAlbums: %w", err)
+		err = fmt.Errorf("getTopAlbums: %w", err)
+		return
 	}
 	if !exists {
-		return "", fmt.Errorf("Database doesn't exist - run update first.")
+		err = fmt.Errorf("Database doesn't exist - run update first.")
+		return
 	}
 
 	const countQueryString = `
@@ -92,31 +94,31 @@ func (t TopAlbumsAnalyzer) GetResults(dbPath string, user string, numToReturn in
 	`
 	countQuery, err := db.Query(countQueryString, user, start.Unix(), end.Unix())
 	if err != nil {
-		return "", fmt.Errorf("getTopAlbums: %w", err)
+		err = fmt.Errorf("getTopAlbums: %w", err)
+		return
 	}
 
 	numAlbums := 0
 	var numListens int64 = 0
-	out := new(bytes.Buffer)
-	table := tablewriter.NewWriter(out)
-	table.SetHeader([]string{"Artist", "Album", "Listens"})
+	analysis.results = append(analysis.results, []string{"Artist", "Album", "Listens"})
 	for countQuery.Next() {
 		album := make([]string, 3)
 		countQuery.Scan(&album[0], &album[1], &album[2])
 		if numAlbums < numToReturn {
-			table.Append(album)
+			analysis.results = append(analysis.results, album)
 		}
 		numAlbums += 1
-		listens, err := strconv.ParseInt(album[2], 10, 64)
+		var listens int64
+		listens, err = strconv.ParseInt(album[2], 10, 64)
 		if err != nil {
-			return "", fmt.Errorf("counting listens: %w", err)
+			err = fmt.Errorf("counting listens: %w", err)
+			return
 		}
 		numListens += listens
 	}
-	table.Render()
 	const dateFormat = "2006-01-02"
-	fmt.Fprintf(out, "Found %d albums and %d listens from %s to %s\n",
+	analysis.summary = fmt.Sprintf("Found %d albums and %d listens from %s to %s\n",
 		numAlbums, numListens, start.Format(dateFormat), end.Format(dateFormat))
 
-	return out.String(), nil
+	return
 }
