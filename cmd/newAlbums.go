@@ -54,6 +54,12 @@ type AlbumCount struct {
 }
 
 type NewAlbumsAnalyzer struct {
+	Config AnalyserConfig
+}
+
+func (t NewAlbumsAnalyzer) SetConfig(config AnalyserConfig) NewAlbumsAnalyzer {
+	t.Config = config
+	return t
 }
 
 func (t NewAlbumsAnalyzer) GetName() string {
@@ -69,7 +75,8 @@ func init() {
 func printNewAlbums(dbPath string, numToReturn int, args []string) error {
 	start, end, err := parseDateRangeFromArgs(args)
 
-	out, err := NewAlbumsAnalyzer{}.GetResults(dbPath, viper.GetString("user"), numToReturn, start, end)
+	config := AnalyserConfig{numToReturn, 0}
+	out, err := NewAlbumsAnalyzer{}.SetConfig(config).GetResults(dbPath, viper.GetString("user"), start, end)
 	if err != nil {
 		return err
 	}
@@ -77,7 +84,7 @@ func printNewAlbums(dbPath string, numToReturn int, args []string) error {
 	return nil
 }
 
-func (t NewAlbumsAnalyzer) GetResults(dbPath string, user string, numToReturn int, start time.Time, end time.Time) (analysis Analysis, err error) {
+func (t NewAlbumsAnalyzer) GetResults(dbPath string, user string, start time.Time, end time.Time) (analysis Analysis, err error) {
 	db, err := openDb(dbPath)
 	if err != nil {
 		err = fmt.Errorf("printNewAlbums: %w", err)
@@ -122,7 +129,7 @@ func (t NewAlbumsAnalyzer) GetResults(dbPath string, user string, numToReturn in
 	n := 0
 	var numListens int64 = 0
 	for _, count := range counts {
-		if numToReturn == 0 || n < numToReturn {
+		if (t.Config.NumToReturn == 0 || n <= t.Config.NumToReturn) && (t.Config.FilterThreshold == 0 || count.Count > t.Config.FilterThreshold) {
 			analysis.results = append(analysis.results, []string{count.Album.Artist, count.Album.Album, strconv.FormatInt(count.Count, 10)})
 		}
 		n += 1

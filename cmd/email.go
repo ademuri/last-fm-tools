@@ -114,7 +114,7 @@ table, th, td {
 			start := time.Date(now.Year()-year, now.Month(), 1, 0, 0, 0, 0, now.Location())
 			end := start.AddDate(0, 1, 0)
 			out += fmt.Sprintf("<h2>%s for %s %s:</h2>\n", action.GetName(), config.User, start.Format("2006-01"))
-			analysis, err := action.GetResults(config.DbPath, config.User, 20, start, end)
+			analysis, err := action.GetResults(config.DbPath, config.User, start, end)
 			if err != nil {
 				return fmt.Errorf("sendEmail: %w", err)
 			}
@@ -184,10 +184,10 @@ table, th, td {
 
 func getActionFromName(actionName string) (Analyser, error) {
 	actionMap := map[string]Analyser{
-		"top-artists": TopArtistsAnalyzer{},
-		"top-albums":  TopAlbumsAnalyzer{},
-		"new-artists": NewArtistsAnalyzer{},
-		"new-albums":  NewAlbumsAnalyzer{},
+		"top-artists": TopArtistsAnalyzer{}.SetConfig(AnalyserConfig{20, 15}),
+		"top-albums":  TopAlbumsAnalyzer{}.SetConfig(AnalyserConfig{20, 15}),
+		"new-artists": NewArtistsAnalyzer{}.SetConfig(AnalyserConfig{0, 5}),
+		"new-albums":  NewAlbumsAnalyzer{}.SetConfig(AnalyserConfig{0, 5}),
 	}
 
 	action, ok := actionMap[actionName]

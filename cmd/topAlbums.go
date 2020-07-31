@@ -49,7 +49,8 @@ func init() {
 func printTopAlbums(dbPath string, numToReturn int, args []string) error {
 	start, end, err := parseDateRangeFromArgs(args)
 
-	out, err := TopAlbumsAnalyzer{}.GetResults(dbPath, viper.GetString("user"), numToReturn, start, end)
+	config := AnalyserConfig{numToReturn, 0}
+	out, err := TopAlbumsAnalyzer{}.SetConfig(config).GetResults(dbPath, viper.GetString("user"), start, end)
 	if err != nil {
 		return err
 	}
@@ -58,13 +59,19 @@ func printTopAlbums(dbPath string, numToReturn int, args []string) error {
 }
 
 type TopAlbumsAnalyzer struct {
+	Config AnalyserConfig
+}
+
+func (t TopAlbumsAnalyzer) SetConfig(config AnalyserConfig) TopAlbumsAnalyzer {
+	t.Config = config
+	return t
 }
 
 func (t TopAlbumsAnalyzer) GetName() string {
 	return "Top albums"
 }
 
-func (t TopAlbumsAnalyzer) GetResults(dbPath string, user string, numToReturn int, start time.Time, end time.Time) (analysis Analysis, err error) {
+func (t TopAlbumsAnalyzer) GetResults(dbPath string, user string, start time.Time, end time.Time) (analysis Analysis, err error) {
 	analysis.results = make([][]string, 0)
 	db, err := openDb(dbPath)
 	if err != nil {
@@ -104,15 +111,15 @@ func (t TopAlbumsAnalyzer) GetResults(dbPath string, user string, numToReturn in
 	for countQuery.Next() {
 		album := make([]string, 3)
 		countQuery.Scan(&album[0], &album[1], &album[2])
-		if numAlbums < numToReturn {
-			analysis.results = append(analysis.results, album)
-		}
 		numAlbums += 1
 		var listens int64
 		listens, err = strconv.ParseInt(album[2], 10, 64)
 		if err != nil {
 			err = fmt.Errorf("counting listens: %w", err)
 			return
+		}
+		if (t.Config.NumToReturn == 0 || numAlbums <= t.Config.NumToReturn) && (t.Config.FilterThreshold == 0 || listens > t.Config.FilterThreshold) {
+			analysis.results = append(analysis.results, album)
 		}
 		numListens += listens
 	}

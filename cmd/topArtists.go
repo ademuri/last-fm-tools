@@ -49,7 +49,8 @@ func init() {
 func printTopArtists(dbPath string, numToReturn int, args []string) error {
 	start, end, err := parseDateRangeFromArgs(args)
 
-	out, err := TopArtistsAnalyzer{}.GetResults(dbPath, viper.GetString("user"), numToReturn, start, end)
+	config := AnalyserConfig{numToReturn, 0}
+	out, err := TopArtistsAnalyzer{}.SetConfig(config).GetResults(dbPath, viper.GetString("user"), start, end)
 	if err != nil {
 		return err
 	}
@@ -58,13 +59,19 @@ func printTopArtists(dbPath string, numToReturn int, args []string) error {
 }
 
 type TopArtistsAnalyzer struct {
+	Config AnalyserConfig
+}
+
+func (t TopArtistsAnalyzer) SetConfig(config AnalyserConfig) TopArtistsAnalyzer {
+	t.Config = config
+	return t
 }
 
 func (t TopArtistsAnalyzer) GetName() string {
 	return "Top artists"
 }
 
-func (t TopArtistsAnalyzer) GetResults(dbPath string, user string, numToReturn int, start time.Time, end time.Time) (analysis Analysis, err error) {
+func (t TopArtistsAnalyzer) GetResults(dbPath string, user string, start time.Time, end time.Time) (analysis Analysis, err error) {
 	db, err := openDb(dbPath)
 	if err != nil {
 		err = fmt.Errorf("printTopArtists: %w", err)
@@ -103,9 +110,6 @@ func (t TopArtistsAnalyzer) GetResults(dbPath string, user string, numToReturn i
 	for countQuery.Next() {
 		artist := make([]string, 2)
 		countQuery.Scan(&artist[0], &artist[1])
-		if numArtists < numToReturn {
-			analysis.results = append(analysis.results, artist)
-		}
 		numArtists += 1
 		var listens int64
 		listens, err = strconv.ParseInt(artist[1], 10, 64)
@@ -113,6 +117,11 @@ func (t TopArtistsAnalyzer) GetResults(dbPath string, user string, numToReturn i
 			err = fmt.Errorf("counting listens: %w", err)
 			return
 		}
+
+		if (t.Config.NumToReturn == 0 || numArtists <= t.Config.NumToReturn) && (t.Config.FilterThreshold == 0 || listens > t.Config.FilterThreshold) {
+			analysis.results = append(analysis.results, artist)
+		}
+
 		numListens += listens
 	}
 

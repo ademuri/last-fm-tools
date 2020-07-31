@@ -28,8 +28,16 @@ type Analysis struct {
 	summary string
 }
 
+type AnalyserConfig struct {
+	// Number of results to return, default is all results.
+	NumToReturn int
+
+	// Only return results with more listens than this. Default is all results.
+	FilterThreshold int64
+}
+
 type Analyser interface {
-	GetResults(dbPath string, user string, numToReturn int, start time.Time, end time.Time) (Analysis, error)
+	GetResults(dbPath string, user string, start time.Time, end time.Time) (Analysis, error)
 
 	GetName() string
 }

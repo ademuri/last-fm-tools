@@ -57,7 +57,8 @@ func init() {
 func printNewArtists(dbPath string, numToReturn int, args []string) error {
 	start, end, err := parseDateRangeFromArgs(args)
 
-	out, err := NewArtistsAnalyzer{}.GetResults(dbPath, viper.GetString("user"), numToReturn, start, end)
+	config := AnalyserConfig{numToReturn, 0}
+	out, err := NewArtistsAnalyzer{}.SetConfig(config).GetResults(dbPath, viper.GetString("user"), start, end)
 	if err != nil {
 		return err
 	}
@@ -66,13 +67,19 @@ func printNewArtists(dbPath string, numToReturn int, args []string) error {
 }
 
 type NewArtistsAnalyzer struct {
+	Config AnalyserConfig
+}
+
+func (t NewArtistsAnalyzer) SetConfig(config AnalyserConfig) NewArtistsAnalyzer {
+	t.Config = config
+	return t
 }
 
 func (t NewArtistsAnalyzer) GetName() string {
 	return "New artists"
 }
 
-func (t NewArtistsAnalyzer) GetResults(dbPath string, user string, numToReturn int, start time.Time, end time.Time) (analysis Analysis, err error) {
+func (t NewArtistsAnalyzer) GetResults(dbPath string, user string, start time.Time, end time.Time) (analysis Analysis, err error) {
 	db, err := openDb(dbPath)
 	if err != nil {
 		err = fmt.Errorf("printNewArtists: %w", err)
@@ -117,7 +124,7 @@ func (t NewArtistsAnalyzer) GetResults(dbPath string, user string, numToReturn i
 	n := 0
 	var numListens int64 = 0
 	for _, count := range counts {
-		if numToReturn == 0 || n < numToReturn {
+		if (t.Config.NumToReturn == 0 || n <= t.Config.NumToReturn) && (t.Config.FilterThreshold == 0 || count.Count > t.Config.FilterThreshold) {
 			analysis.results = append(analysis.results, []string{count.Artist, strconv.FormatInt(count.Count, 10)})
 		}
 		n += 1
