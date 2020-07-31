@@ -39,6 +39,7 @@ go_test(
     srcs = [
         "addReport_test.go",
         "date_test.go",
+        "email_test.go",
         "newAlbums_test.go",
         "newArtists_test.go",
         "sendReports_test.go",

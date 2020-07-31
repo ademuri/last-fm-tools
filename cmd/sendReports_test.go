@@ -18,16 +18,28 @@ package cmd
 
 import (
 	"testing"
+	"time"
 )
 
 func TestSendReports(t *testing.T) {
-	_, err := createTestDb()
+	user1 := "testuser"
+	user2 := "other user"
+
+	db, err := createTestDb()
 	if err != nil {
 		t.Fatalf("createTestDb() error: %w", err)
 	}
+	err = createListenForDate(db, user1, time.Now())
+	if err != nil {
+		t.Fatalf("createListenForDate(%q) error: %w", user1, err)
+	}
+	err = createListenForDate(db, user2, time.Now())
+	if err != nil {
+		t.Fatalf("createListenForDate(%q) error: %w", user2, err)
+	}
 
-	err = addReport(getTestDbPath(), "test report", "testuser", "testuser@gmail.com", 1, []string{"top-albums", "top-artists"})
-	err = addReport(getTestDbPath(), "other test report", "other user", "otheruser@gmail.com", 1, []string{"new-albums", "new-artists"})
+	err = addReport(getTestDbPath(), "test report", user1, "testuser@gmail.com", 1, []string{"top-albums", "top-artists"})
+	err = addReport(getTestDbPath(), "other test report", user2, "otheruser@gmail.com", 1, []string{"new-albums", "new-artists"})
 	if err != nil {
 		t.Fatalf("addReport() error: %w", err)
 	}

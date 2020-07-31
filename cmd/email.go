@@ -16,6 +16,7 @@ limitations under the License.
 package cmd
 
 import (
+	"database/sql"
 	"fmt"
 	"os"
 	"time"
@@ -80,6 +81,16 @@ func sendEmail(config SendEmailConfig) error {
 		actions = append(actions, action)
 	}
 
+	db, err := createDatabase(config.DbPath)
+	years, err := getNumYearsOfListeningData(db, config.User)
+	if err != nil {
+		return fmt.Errorf("getNumYearsOfListeningData(): %w")
+	}
+	err = db.Close()
+	if err != nil {
+		return fmt.Errorf("closing database: %w")
+	}
+
 	out := `
 <html>
   <head>
@@ -99,8 +110,7 @@ table, th, td {
 		out += `
 		<div>
 `
-		years := []int{1, 2, 3}
-		for _, year := range years {
+		for year := 1; year < years; year++ {
 			start := time.Date(now.Year()-year, now.Month(), 1, 0, 0, 0, 0, now.Location())
 			end := start.AddDate(0, 1, 0)
 			out += fmt.Sprintf("<h2>%s for %s %s:</h2>\n", action.GetName(), config.User, start.Format("2006-01"))
@@ -149,7 +159,7 @@ table, th, td {
 		from := mail.NewEmail("last-fm-tools", config.From)
 
 		to := mail.NewEmail(config.To, config.To)
-		message := mail.NewSingleEmail(from, subject, to, out, fmt.Sprintf("<pre>%s</pre>", out))
+		message := mail.NewSingleEmail(from, subject, to, out, fmt.Sprintf("%s", out))
 		client := sendgrid.NewSendClient(viper.GetString("sendgrid_api_key"))
 		_, err := client.Send(message)
 		if err != nil {
@@ -186,4 +196,27 @@ func getActionFromName(actionName string) (Analyser, error) {
 	}
 
 	return action, nil
+}
+
+func getNumYearsOfListeningData(db *sql.DB, user string) (int, error) {
+	query, err := db.Query("SELECT date FROM Listen WHERE user = ? ORDER BY date ASC LIMIT 1;", user)
+	if err != nil {
+		err = fmt.Errorf("query(%q): %w", user, err)
+		return 0, err
+	}
+	defer query.Close()
+
+	if !query.Next() {
+		return 0, fmt.Errorf("No listens found for user %q", user)
+	}
+
+	var oldest time.Time
+	query.Scan(&oldest)
+
+	now := time.Now()
+	years := now.Year() - oldest.Year()
+	if now.Month() > oldest.Month() || (now.Month() == oldest.Month() && now.Day() >= oldest.Day()) {
+		years++
+	}
+	return years, nil
 }
