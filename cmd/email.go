@@ -51,7 +51,7 @@ var emailCmd = &cobra.Command{
 			To:         args[0],
 			ReportName: viper.GetString("name"),
 			Types:      args[1:],
-			DryRun:     viper.GetBool("dry_run"),
+			DryRun:     viper.GetBool("dryRun"),
 		}
 		err := sendEmail(config)
 		if err != nil {
@@ -66,7 +66,7 @@ func init() {
 
 	var dryRun bool
 	emailCmd.Flags().BoolVarP(&dryRun, "dry_run", "n", false, "When true, just print instead of emailing")
-	viper.BindPFlag("dry_run", emailCmd.Flags().Lookup("dry_run"))
+	viper.BindPFlag("dry_run", emailCmd.Flags().Lookup("dryRun"))
 }
 
 func sendEmail(config SendEmailConfig) error {
