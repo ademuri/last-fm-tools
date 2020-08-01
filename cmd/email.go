@@ -66,7 +66,7 @@ func init() {
 
 	var dryRun bool
 	emailCmd.Flags().BoolVarP(&dryRun, "dry_run", "n", false, "When true, just print instead of emailing")
-	viper.BindPFlag("dry_run", emailCmd.Flags().Lookup("dryRun"))
+	viper.BindPFlag("dryRun", emailCmd.Flags().Lookup("dry_run"))
 }
 
 func sendEmail(config SendEmailConfig) error {

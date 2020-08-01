@@ -1,0 +1,6 @@
+--2020-08-01 13:27:40--  http://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks
+Resolving ws.audioscrobbler.com (ws.audioscrobbler.com)... 64.30.224.206
+Connecting to ws.audioscrobbler.com (ws.audioscrobbler.com)|64.30.224.206|:80... connected.
+HTTP request sent, awaiting response... 400 Bad Request
+2020-08-01 13:27:41 ERROR 400: Bad Request.
+
