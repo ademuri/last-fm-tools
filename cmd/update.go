@@ -51,7 +51,7 @@ var updateCmd = &cobra.Command{
 			DbPath: viper.GetString("database"),
 			User:   viper.GetString("user"),
 			After:  viper.GetString("after"),
-			Force:  viper.GetBool("user"),
+			Force:  viper.GetBool("force"),
 		}
 
 		err := updateDatabase(config)
