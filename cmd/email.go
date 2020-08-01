@@ -199,7 +199,9 @@ func getActionFromName(actionName string) (Analyser, error) {
 }
 
 func getNumYearsOfListeningData(db *sql.DB, user string) (int, error) {
-	query, err := db.Query("SELECT date FROM Listen WHERE user = ? ORDER BY date ASC LIMIT 1;", user)
+	// Note: last.fm seems to have some junk listening data with epoch timestamps like 1, 2, 3...
+	// Just ignore those.
+	query, err := db.Query("SELECT date FROM Listen WHERE user = ? AND date > 10000 ORDER BY date ASC LIMIT 1;", user)
 	if err != nil {
 		err = fmt.Errorf("query(%q): %w", user, err)
 		return 0, err
