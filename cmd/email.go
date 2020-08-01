@@ -119,6 +119,12 @@ table, th, td {
 				return fmt.Errorf("sendEmail: %w", err)
 			}
 
+			if len(analysis.results) <= 1 {
+				// No listens found
+				out += "<div>No listens found.</div>\n"
+				continue
+			}
+
 			out += `
 			<table>
 				<thead>
