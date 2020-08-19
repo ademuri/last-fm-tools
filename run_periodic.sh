@@ -1,3 +1,5 @@
+#!/bin/bash
+
 set -euo pipefail
 
 tools_dir="$HOME/.last-fm-tools"
