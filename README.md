@@ -50,3 +50,13 @@ To run tests:
 ```bash
 $ bazel test //...
 ```
+
+## Updating dependencies
+
+To update dependencies edit [go.mod], and then run Gazelle:
+
+```bash
+bazel run //:gazelle -- update-repos -from_file=go.mod -to_macro=repositories.bzl%go_repositories
+bazel run //:gazelle
+```
+
