@@ -21,7 +21,7 @@ Configuration options
   Note that last.fm doesn't save these values, so you'll need to put them
   somewhere safe (e.g. the config file mentioned below, or a password manager).
 - `user` is the last.fm username.
-- `database` is the path to the sqlite database file. 
+- `database` is the path to the sqlite database file.
 - `sendgrid_api_key` (optional) is the API key for SendGrid, used for sending
   email reports
 - `from` (optional) is the email address to send reports from
@@ -47,6 +47,7 @@ $ bazel run //:last-fm-tools -- update --user=foo --database=$HOME/lastfm.db
 ```
 
 To run tests:
+
 ```bash
 $ bazel test //...
 ```
@@ -60,3 +61,18 @@ bazel run //:gazelle -- update-repos -from_file=go.mod -to_macro=repositories.bz
 bazel run //:gazelle
 ```
 
+# Gemini
+
+To use this project with the Gemini CLI in a consistent environment, you can use the provided `Dockerfile` as a sandbox.
+
+1. **Build the sandbox image:**
+   ```bash
+   docker build -t last-fm-tools-sandbox .
+   ```
+
+2. **Run Gemini with the sandbox:**
+   ```bash
+   GEMINI_SANDBOX_IMAGE=last-fm-tools-sandbox gemini
+   ```
+
+This ensures that Gemini has access to the correct version of Go (1.25.0) and Bazel without modifying your local system.
