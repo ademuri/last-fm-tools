@@ -43,13 +43,13 @@ This project uses [bazel](https://bazel.build/) for building. It's the only
 required dependency. To build and run directly using Bazel:
 
 ```bash
-$ bazel run //:last-fm-tools -- update --user=foo --database=$HOME/lastfm.db
+$ USE_BAZEL_VERSION=7.1.0 npx @bazel/bazelisk run //:last-fm-tools -- update --user=foo --database=$HOME/lastfm.db
 ```
 
 To run tests:
 
 ```bash
-$ bazel test //...
+$ USE_BAZEL_VERSION=7.1.0 npx @bazel/bazelisk test //...
 ```
 
 ## Updating dependencies
@@ -57,8 +57,8 @@ $ bazel test //...
 To update dependencies edit [go.mod], and then run Gazelle:
 
 ```bash
-bazel run //:gazelle -- update-repos -from_file=go.mod -to_macro=repositories.bzl%go_repositories
-bazel run //:gazelle
+USE_BAZEL_VERSION=7.1.0 npx @bazel/bazelisk run //:gazelle -- update-repos -from_file=go.mod -to_macro=repositories.bzl%go_repositories
+USE_BAZEL_VERSION=7.1.0 npx @bazel/bazelisk run //:gazelle
 ```
 
 # Gemini
