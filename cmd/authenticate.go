@@ -89,6 +89,10 @@ func getSessionKey(dbPath string, fromAddress string, args []string) error {
 	smtpUser := viper.GetString("smtp_username")
 	smtpPass := viper.GetString("smtp_password")
 
+	if smtpUser == "" || smtpPass == "" {
+		return fmt.Errorf("smtp_username and smtp_password must be set in order to send authentication email")
+	}
+
 	auth := smtp.PlainAuth("", smtpUser, smtpPass, "smtp.gmail.com")
 	err = smtp.SendMail("smtp.gmail.com:587", auth, fromAddress, []string{toAddress}, []byte(msg))
 	if err != nil {

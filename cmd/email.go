@@ -165,6 +165,10 @@ table, th, td {
 	if config.DryRun {
 		fmt.Printf("Would have sent email: \nsubject: %s\n%s\n", subject, out)
 	} else {
+		if config.SMTPUsername == "" || config.SMTPPassword == "" {
+			return fmt.Errorf("smtp_username and smtp_password must be set in order to send emails")
+		}
+
 		msg := "From: last-fm-tools <" + config.From + ">\r\n" +
 			"To: " + config.To + "\r\n" +
 			"Subject: " + subject + "\r\n" +

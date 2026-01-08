@@ -22,8 +22,8 @@ Configuration options
   somewhere safe (e.g. the config file mentioned below, or a password manager).
 - `user` is the last.fm username.
 - `database` is the path to the sqlite database file.
-- `sendgrid_api_key` (optional) is the API key for SendGrid, used for sending
-  email reports
+- `smtp_username` (optional) is the SMTP username (e.g. your Gmail address), used for sending email reports.
+- `smtp_password` (optional) is the SMTP password. For Gmail, this must be a [Google App Password](https://support.google.com/accounts/answer/185833).
 - `from` (optional) is the email address to send reports from
 
 These may be specified either as normal flags, or as configuration options in
@@ -33,7 +33,8 @@ These may be specified either as normal flags, or as configuration options in
 database: "$HOME/lastfm.db"
 api_key: ""
 secret: ""
-sendgrid_api_key: ""
+smtp_username: "me@gmail.com"
+smtp_password: "abcd1234efgh5678"
 from: "me@me.com"
 ```
 
@@ -66,6 +67,7 @@ USE_BAZEL_VERSION=7.1.0 npx @bazel/bazelisk run //:gazelle
 To use this project with the Gemini CLI in a consistent environment, you can use the provided `Dockerfile` as a sandbox.
 
 1. **Build the sandbox image:**
+
    ```bash
    docker build -t last-fm-tools-sandbox .
    ```
