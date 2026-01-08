@@ -32,7 +32,8 @@ var lastFmApiKey string
 var lastFmSecret string
 var lastFmUser string
 var databasePath string
-var sendgridApiKey string
+var smtpUsername string
+var smtpPassword string
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -78,11 +79,12 @@ func init() {
 		&databasePath, "database", "d", "./lastfm.db", "Path to the SQLite database")
 	viper.BindPFlag("database", rootCmd.PersistentFlags().Lookup("database"))
 
-	rootCmd.PersistentFlags().StringVar(&sendgridApiKey, "sendgrid_api_key", "", "SendGrid API key, for sending email reports")
-	viper.BindPFlag("sendgrid_api_key", rootCmd.PersistentFlags().Lookup("sendgrid_api_key"))
+	rootCmd.PersistentFlags().StringVar(&smtpUsername, "smtp_username", "", "SMTP username")
+	viper.BindPFlag("smtp_username", rootCmd.PersistentFlags().Lookup("smtp_username"))
 
-	// Note: you'll need to set up sender identity verification
-	// https://sendgrid.com/docs/for-developers/sending-email/sender-identity/
+	rootCmd.PersistentFlags().StringVar(&smtpPassword, "smtp_password", "", "SMTP password")
+	viper.BindPFlag("smtp_password", rootCmd.PersistentFlags().Lookup("smtp_password"))
+
 	var from string
 	rootCmd.PersistentFlags().StringVar(&from, "from", "", "From email address")
 	rootCmd.MarkPersistentFlagRequired("from")

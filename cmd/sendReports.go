@@ -27,9 +27,11 @@ import (
 )
 
 type SendReportsConfig struct {
-	DbPath string
-	From   string
-	DryRun bool
+	DbPath       string
+	From         string
+	DryRun       bool
+	SMTPUsername string
+	SMTPPassword string
 }
 
 var sendReportsCmd = &cobra.Command{
@@ -38,9 +40,11 @@ var sendReportsCmd = &cobra.Command{
 	Long:  ``,
 	Run: func(cmd *cobra.Command, args []string) {
 		config := SendReportsConfig{
-			DbPath: viper.GetString("database"),
-			From:   viper.GetString("from"),
-			DryRun: viper.GetBool("dry_run"),
+			DbPath:       viper.GetString("database"),
+			From:         viper.GetString("from"),
+			DryRun:       viper.GetBool("dry_run"),
+			SMTPUsername: viper.GetString("smtp_username"),
+			SMTPPassword: viper.GetString("smtp_password"),
 		}
 		err := sendReports(config)
 		if err != nil {
@@ -78,9 +82,11 @@ func sendReports(config SendReportsConfig) error {
 
 		now := time.Now()
 		emailConfig := SendEmailConfig{
-			DbPath: config.DbPath,
-			From:   config.From,
-			DryRun: config.DryRun,
+			DbPath:       config.DbPath,
+			From:         config.From,
+			DryRun:       config.DryRun,
+			SMTPUsername: config.SMTPUsername,
+			SMTPPassword: config.SMTPPassword,
 		}
 		err = reports.Scan(&emailConfig.ReportName, &emailConfig.User, &emailConfig.To, &sentOrNull, &runDay, &types)
 		if err != nil {

@@ -18,12 +18,11 @@ package cmd
 import (
 	"bufio"
 	"fmt"
+	"net/smtp"
 	"os"
 	"strings"
 
 	"github.com/ademuri/lastfm-go/lastfm"
-	"github.com/sendgrid/sendgrid-go"
-	"github.com/sendgrid/sendgrid-go/helpers/mail"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -81,13 +80,17 @@ func getSessionKey(dbPath string, fromAddress string, args []string) error {
 	}
 
 	toAddress := args[0]
-	from := mail.NewEmail("last-fm-tools", fromAddress)
-	subject := "Authenticate last-fm-tools"
-	to := mail.NewEmail(toAddress, toAddress)
-	bodyText := "Click here to authenticate: " + authUrl
-	message := mail.NewSingleEmail(from, subject, to, bodyText, bodyText)
-	client := sendgrid.NewSendClient(viper.GetString("sendgrid_api_key"))
-	_, err = client.Send(message)
+	msg := "From: last-fm-tools <" + fromAddress + ">\r\n" +
+		"To: " + toAddress + "\r\n" +
+		"Subject: Authenticate last-fm-tools\r\n" +
+		"\r\n" +
+		"Click here to authenticate: " + authUrl
+
+	smtpUser := viper.GetString("smtp_username")
+	smtpPass := viper.GetString("smtp_password")
+
+	auth := smtp.PlainAuth("", smtpUser, smtpPass, "smtp.gmail.com")
+	err = smtp.SendMail("smtp.gmail.com:587", auth, fromAddress, []string{toAddress}, []byte(msg))
 	if err != nil {
 		return fmt.Errorf("sendEmail: %w", err)
 	}

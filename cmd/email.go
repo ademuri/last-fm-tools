@@ -18,23 +18,24 @@ package cmd
 import (
 	"database/sql"
 	"fmt"
+	"net/smtp"
 	"os"
 	"time"
 
-	"github.com/sendgrid/sendgrid-go"
-	"github.com/sendgrid/sendgrid-go/helpers/mail"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 type SendEmailConfig struct {
-	DbPath     string
-	User       string
-	From       string
-	To         string
-	ReportName string
-	Types      []string
-	DryRun     bool
+	DbPath       string
+	User         string
+	From         string
+	To           string
+	ReportName   string
+	Types        []string
+	DryRun       bool
+	SMTPUsername string
+	SMTPPassword string
 }
 
 var emailCmd = &cobra.Command{
@@ -45,13 +46,15 @@ var emailCmd = &cobra.Command{
 	Args: cobra.MinimumNArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
 		config := SendEmailConfig{
-			DbPath:     viper.GetString("database"),
-			User:       viper.GetString("user"),
-			From:       viper.GetString("from"),
-			To:         args[0],
-			ReportName: viper.GetString("name"),
-			Types:      args[1:],
-			DryRun:     viper.GetBool("dryRun"),
+			DbPath:       viper.GetString("database"),
+			User:         viper.GetString("user"),
+			From:         viper.GetString("from"),
+			To:           args[0],
+			ReportName:   viper.GetString("name"),
+			Types:        args[1:],
+			DryRun:       viper.GetBool("dryRun"),
+			SMTPUsername: viper.GetString("smtp_username"),
+			SMTPPassword: viper.GetString("smtp_password"),
 		}
 		err := sendEmail(config)
 		if err != nil {
@@ -162,12 +165,16 @@ table, th, td {
 	if config.DryRun {
 		fmt.Printf("Would have sent email: \nsubject: %s\n%s\n", subject, out)
 	} else {
-		from := mail.NewEmail("last-fm-tools", config.From)
+		msg := "From: last-fm-tools <" + config.From + ">\r\n" +
+			"To: " + config.To + "\r\n" +
+			"Subject: " + subject + "\r\n" +
+			"MIME-Version: 1.0\r\n" +
+			"Content-Type: text/html; charset=\"UTF-8\"\r\n" +
+			"\r\n" +
+			out
 
-		to := mail.NewEmail(config.To, config.To)
-		message := mail.NewSingleEmail(from, subject, to, out, fmt.Sprintf("%s", out))
-		client := sendgrid.NewSendClient(viper.GetString("sendgrid_api_key"))
-		_, err := client.Send(message)
+		auth := smtp.PlainAuth("", config.SMTPUsername, config.SMTPPassword, "smtp.gmail.com")
+		err := smtp.SendMail("smtp.gmail.com:587", auth, config.From, []string{config.To}, []byte(msg))
 		if err != nil {
 			return fmt.Errorf("sendEmail: %w", err)
 		}
