@@ -32,6 +32,8 @@ type SendReportsConfig struct {
 	DryRun       bool
 	SMTPUsername string
 	SMTPPassword string
+	Force        bool
+	User         string
 }
 
 var sendReportsCmd = &cobra.Command{
@@ -39,12 +41,16 @@ var sendReportsCmd = &cobra.Command{
 	Short: "Update the database and send email reports.",
 	Long:  ``,
 	Run: func(cmd *cobra.Command, args []string) {
+		dryRun, _ := cmd.Flags().GetBool("dry_run")
+		force, _ := cmd.Flags().GetBool("force")
 		config := SendReportsConfig{
 			DbPath:       viper.GetString("database"),
 			From:         viper.GetString("from"),
-			DryRun:       viper.GetBool("dry_run"),
+			DryRun:       dryRun,
 			SMTPUsername: viper.GetString("smtp_username"),
 			SMTPPassword: viper.GetString("smtp_password"),
+			Force:        force,
+			User:         viper.GetString("user"),
 		}
 		err := sendReports(config)
 		if err != nil {
@@ -59,7 +65,9 @@ func init() {
 
 	var dryRun bool
 	sendReportsCmd.Flags().BoolVarP(&dryRun, "dry_run", "n", false, "When true, just print instead of emailing")
-	viper.BindPFlag("dry_run", sendReportsCmd.Flags().Lookup("dry_run"))
+
+	var force bool
+	sendReportsCmd.Flags().BoolVarP(&force, "force", "f", false, "When true, send reports even if they've already been sent")
 }
 
 func sendReports(config SendReportsConfig) error {
@@ -92,6 +100,11 @@ func sendReports(config SendReportsConfig) error {
 		if err != nil {
 			return fmt.Errorf("Getting report params: %w", err)
 		}
+
+		if config.User != "" && !strings.EqualFold(config.User, emailConfig.User) {
+			continue
+		}
+
 		var sent time.Time
 		if sentOrNull.Valid {
 			sent = sentOrNull.Time
@@ -100,13 +113,16 @@ func sendReports(config SendReportsConfig) error {
 		emailConfig.Types = strings.Split(types, ",")
 		toSendThisMonth := time.Date(now.Year(), now.Month(), runDay, 0, 0, 0, 0, now.Location())
 		toSendLastMonth := time.Date(now.Year(), now.Month()-1, runDay, 0, 0, 0, 0, now.Location())
-		if sent.After(toSendThisMonth) {
-			fmt.Printf("Report (%q, %q) was already sent this month on %s, not sending.\n", emailConfig.User, emailConfig.ReportName, sent.Format("2006-01-02"))
-			continue
-		}
-		if now.Before(toSendThisMonth) && sent.After(toSendLastMonth) {
-			fmt.Printf("Report (%q, %q) was already sent for last month on %s, not sending.\n", emailConfig.User, emailConfig.ReportName, sent.Format("2006-01-02"))
-			continue
+
+		if !config.Force {
+			if sent.After(toSendThisMonth) {
+				fmt.Printf("Report (%q, %q) was already sent this month on %s, not sending.\n", emailConfig.User, emailConfig.ReportName, sent.Format("2006-01-02"))
+				continue
+			}
+			if now.Before(toSendThisMonth) && sent.After(toSendLastMonth) {
+				fmt.Printf("Report (%q, %q) was already sent for last month on %s, not sending.\n", emailConfig.User, emailConfig.ReportName, sent.Format("2006-01-02"))
+				continue
+			}
 		}
 
 		emailConfigs = append(emailConfigs, emailConfig)
