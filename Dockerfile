@@ -41,5 +41,9 @@ ENV PATH="${GOPATH}/bin:${PATH}"
 # Install Bazelisk globally
 RUN npm install -g @bazel/bazelisk
 
+RUN npm install -g husky
+
+RUN npm install -g @google/gemini-cli
+
 # Default command
 CMD ["/bin/bash"]

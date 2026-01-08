@@ -45,11 +45,15 @@ type Analyser interface {
 func (a Analysis) String() string {
 	out := new(bytes.Buffer)
 	table := tablewriter.NewWriter(out)
-	table.SetHeader(a.results[0])
+	table.Header(a.results[0])
 	for _, row := range a.results[1:] {
-		table.Append(row)
+		if err := table.Append(row); err != nil {
+			return fmt.Sprintf("Error rendering table: %v", err)
+		}
 	}
-	table.Render()
+	if err := table.Render(); err != nil {
+		return fmt.Sprintf("Error rendering table: %v", err)
+	}
 	fmt.Fprintf(out, "%s\n", a.summary)
 	return out.String()
 }

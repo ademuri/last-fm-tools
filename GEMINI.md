@@ -23,5 +23,3 @@ $ bash gemini-build.sh build
 # OR
 $ bash gemini-build.sh test
 ```
-
-**Note:** The script runs the chosen verb on `//...`. To build specific targets or run the binary, you may need to modify the script or run the internal commands manually.
