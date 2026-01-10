@@ -59,4 +59,28 @@ CREATE TABLE Report (
   types TEXT,
   FOREIGN KEY (user) REFERENCES User(name),
   CONSTRAINT PK_Report PRIMARY KEY (name, user, email)
-)
+);
+
+CREATE TABLE Tag (
+  name TEXT PRIMARY KEY
+);
+
+CREATE TABLE ArtistTag (
+  artist TEXT,
+  tag TEXT,
+  count INTEGER,
+  FOREIGN KEY (artist) REFERENCES Artist(name),
+  FOREIGN KEY (tag) REFERENCES Tag(name),
+  PRIMARY KEY (artist, tag)
+);
+
+CREATE TABLE AlbumTag (
+  artist TEXT,
+  album TEXT,
+  tag TEXT,
+  count INTEGER,
+  FOREIGN KEY (artist) REFERENCES Artist(name),
+  FOREIGN KEY (album) REFERENCES Album(name),
+  FOREIGN KEY (tag) REFERENCES Tag(name),
+  PRIMARY KEY (artist, album, tag)
+);

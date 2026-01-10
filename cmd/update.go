@@ -182,6 +182,12 @@ func updateDatabase(config UpdateConfig) error {
 		limiter.Wait(context.Background())
 	}
 
+	fmt.Println("Updating tags...")
+	err = updateTags(database, lastfm_client)
+	if err != nil {
+		return err
+	}
+
 	err = setLastUpdated(database, user, now)
 	if err != nil {
 		return err
@@ -214,6 +220,39 @@ func createTables(db *sql.DB) error {
 		return err
 	}
 
+	return createTagTables(db)
+}
+
+func createTagTables(db *sql.DB) error {
+	query := `
+CREATE TABLE IF NOT EXISTS Tag (
+  name TEXT PRIMARY KEY
+);
+
+CREATE TABLE IF NOT EXISTS ArtistTag (
+  artist TEXT,
+  tag TEXT,
+  count INTEGER,
+  FOREIGN KEY (artist) REFERENCES Artist(name),
+  FOREIGN KEY (tag) REFERENCES Tag(name),
+  PRIMARY KEY (artist, tag)
+);
+
+CREATE TABLE IF NOT EXISTS AlbumTag (
+  artist TEXT,
+  album TEXT,
+  tag TEXT,
+  count INTEGER,
+  FOREIGN KEY (artist) REFERENCES Artist(name),
+  FOREIGN KEY (album) REFERENCES Album(name),
+  FOREIGN KEY (tag) REFERENCES Tag(name),
+  PRIMARY KEY (artist, album, tag)
+);
+`
+	_, err := db.Exec(query)
+	if err != nil {
+		return fmt.Errorf("createTagTables: %w", err)
+	}
 	return nil
 }
 
@@ -380,7 +419,20 @@ func getLatestListen(db *sql.DB, user string) (date time.Time, err error) {
 		return
 	}
 
-	query.Scan(&date)
+	var dateStr string
+	err = query.Scan(&dateStr)
+	if err != nil {
+		err = fmt.Errorf("getLatestListen(%q): scanning date: %w", user, err)
+		return
+	}
+
+	dateInt, err := strconv.ParseInt(dateStr, 10, 64)
+	if err != nil {
+		err = fmt.Errorf("getLatestListen(%q): parsing date %q: %w", user, dateStr, err)
+		return
+	}
+
+	date = time.Unix(dateInt, 0)
 	return
 }
 
@@ -405,5 +457,199 @@ func setLastUpdated(db *sql.DB, user string, updated time.Time) error {
 	if err != nil {
 		return fmt.Errorf("setLastUpdated(%q, %q): %w", user, updated, err)
 	}
+	return nil
+}
+
+func updateTags(db *sql.DB, lastfm_client *lastfm.Api) error {
+	limiter := rate.NewLimiter(rate.Every(1*time.Second), 1)
+
+	err := updateArtistTags(db, lastfm_client, limiter)
+	if err != nil {
+		return fmt.Errorf("updateArtistTags: %w", err)
+	}
+
+	err = updateAlbumTags(db, lastfm_client, limiter)
+	if err != nil {
+		return fmt.Errorf("updateAlbumTags: %w", err)
+	}
+
+	return nil
+}
+
+func updateArtistTags(db *sql.DB, client *lastfm.Api, limiter *rate.Limiter) error {
+	query := `
+		SELECT t.artist
+		FROM Listen l
+		JOIN Track t ON l.track = t.id
+		WHERE t.artist NOT IN (SELECT artist FROM ArtistTag)
+		GROUP BY t.artist
+		HAVING COUNT(*) > 10
+	`
+	rows, err := db.Query(query)
+	if err != nil {
+		return fmt.Errorf("querying artists: %w", err)
+	}
+	defer rows.Close()
+
+	artists := []string{}
+	for rows.Next() {
+		var artist string
+		if err := rows.Scan(&artist); err != nil {
+			return fmt.Errorf("scanning artist: %w", err)
+		}
+		artists = append(artists, artist)
+	}
+	rows.Close()
+
+	fmt.Printf("Found %d artists without tags\n", len(artists))
+
+	for i, artist := range artists {
+		fmt.Printf("[%d/%d] Fetching tags for artist: %s\n", i+1, len(artists), artist)
+		limiter.Wait(context.Background())
+
+		var topTags lastfm.ArtistGetTopTags
+		err := retry.Do(
+			func() error {
+				var err error
+				topTags, err = client.Artist.GetTopTags(lastfm.P{
+					"artist":      artist,
+					"autocorrect": 1,
+				})
+				return err
+			},
+			retry.RetryIf(func(err error) bool {
+				if lerr, ok := err.(*lastfm.LastfmError); ok {
+					if lerr.Code/100 == 5 {
+						fmt.Printf("last.fm errored, retrying: %w\n", lerr)
+						return true
+					}
+				}
+				return false
+			}),
+		)
+		if err != nil {
+			fmt.Printf("Error fetching tags for artist %s: %v\n", artist, err)
+			continue
+		}
+
+		if len(topTags.Tags) > 0 {
+			tx, err := db.Begin()
+			if err != nil {
+				return fmt.Errorf("beginning transaction: %w", err)
+			}
+
+			for _, tag := range topTags.Tags {
+				_, err = tx.Exec("INSERT OR IGNORE INTO Tag (name) VALUES (?)", tag.Name)
+				if err != nil {
+					tx.Rollback()
+					return fmt.Errorf("inserting tag %s: %w", tag.Name, err)
+				}
+
+				_, err = tx.Exec("INSERT INTO ArtistTag (artist, tag, count) VALUES (?, ?, ?)", artist, tag.Name, tag.Count)
+				if err != nil {
+					tx.Rollback()
+					return fmt.Errorf("inserting artist tag %s - %s: %w", artist, tag.Name, err)
+				}
+			}
+
+			if err := tx.Commit(); err != nil {
+				return fmt.Errorf("committing transaction: %w", err)
+			}
+		}
+	}
+
+	return nil
+}
+
+func updateAlbumTags(db *sql.DB, client *lastfm.Api, limiter *rate.Limiter) error {
+	// Find albums that don't have tags
+	query := `
+		SELECT t.artist, t.album
+		FROM Listen l
+		JOIN Track t ON l.track = t.id
+		WHERE t.album != "" AND NOT EXISTS (
+			SELECT 1 FROM AlbumTag at WHERE at.artist = t.artist AND at.album = t.album
+		)
+		GROUP BY t.artist, t.album
+		HAVING COUNT(*) > 10
+	`
+	rows, err := db.Query(query)
+	if err != nil {
+		return fmt.Errorf("querying albums: %w", err)
+	}
+	defer rows.Close()
+
+	type albumKey struct {
+		artist string
+		name   string
+	}
+	albums := []albumKey{}
+	for rows.Next() {
+		var a albumKey
+		if err := rows.Scan(&a.artist, &a.name); err != nil {
+			return fmt.Errorf("scanning album: %w", err)
+		}
+		albums = append(albums, a)
+	}
+	rows.Close()
+
+	fmt.Printf("Found %d albums without tags\n", len(albums))
+
+	for i, alb := range albums {
+		fmt.Printf("[%d/%d] Fetching tags for album: %s - %s\n", i+1, len(albums), alb.artist, alb.name)
+		limiter.Wait(context.Background())
+
+		var topTags lastfm.AlbumGetTopTags
+		err := retry.Do(
+			func() error {
+				var err error
+				topTags, err = client.Album.GetTopTags(lastfm.P{
+					"artist":      alb.artist,
+					"album":       alb.name,
+					"autocorrect": 1,
+				})
+				return err
+			},
+			retry.RetryIf(func(err error) bool {
+				if lerr, ok := err.(*lastfm.LastfmError); ok {
+					if lerr.Code/100 == 5 {
+						fmt.Printf("last.fm errored, retrying: %w\n", lerr)
+						return true
+					}
+				}
+				return false
+			}),
+		)
+		if err != nil {
+			fmt.Printf("Error fetching tags for album %s - %s: %v\n", alb.artist, alb.name, err)
+			continue
+		}
+
+		if len(topTags.Tags) > 0 {
+			tx, err := db.Begin()
+			if err != nil {
+				return fmt.Errorf("beginning transaction: %w", err)
+			}
+
+			for _, tag := range topTags.Tags {
+				_, err = tx.Exec("INSERT OR IGNORE INTO Tag (name) VALUES (?)", tag.Name)
+				if err != nil {
+					tx.Rollback()
+					return fmt.Errorf("inserting tag %s: %w", tag.Name, err)
+				}
+
+				_, err = tx.Exec("INSERT INTO AlbumTag (artist, album, tag, count) VALUES (?, ?, ?, ?)", alb.artist, alb.name, tag.Name, tag.Count)
+				if err != nil {
+					tx.Rollback()
+					return fmt.Errorf("inserting album tag %s - %s - %s: %w", alb.artist, alb.name, tag.Name, err)
+				}
+			}
+
+			if err := tx.Commit(); err != nil {
+				return fmt.Errorf("committing transaction: %w", err)
+			}
+		}
+	}
+
 	return nil
 }
