@@ -23,10 +23,16 @@ import (
 	"github.com/spf13/viper"
 )
 
+var (
+	limitArtists int
+	limitAlbums  int
+	limitTracks  int
+)
+
 var tasteReportCmd = &cobra.Command{
 	Use:   "taste-report [from] [to (optional)]",
 	Short: "Generates a textual summary of music taste",
-	Long:  `Generates a comprehensive report including top artists and albums over a specified period.`, 
+	Long:  `Generates a comprehensive report including top artists and albums over a specified period.`,
 	Args:  cobra.RangeArgs(1, 2),
 	Run: func(cmd *cobra.Command, args []string) {
 		err := printTasteReport(viper.GetString("database"), args)
@@ -39,6 +45,9 @@ var tasteReportCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(tasteReportCmd)
+	tasteReportCmd.Flags().IntVar(&limitArtists, "artists", 10, "Number of top artists to show")
+	tasteReportCmd.Flags().IntVar(&limitAlbums, "albums", 10, "Number of top albums to show")
+	tasteReportCmd.Flags().IntVar(&limitTracks, "tracks", 10, "Number of top tracks to show")
 }
 
 func printTasteReport(dbPath string, args []string) error {
@@ -73,64 +82,102 @@ func printTasteReport(dbPath string, args []string) error {
 	fmt.Printf("Total Scrobbles: %d\n\n", totalScrobbles)
 
 	// 2. Top Artists
-	const artistQueryString = `
-	SELECT Track.artist, COUNT(Listen.id)
-	FROM Listen
-	INNER JOIN Track ON Track.id = Listen.track
-	WHERE user = ?
-	AND Listen.date BETWEEN ? AND ?
-	GROUP BY Track.artist
-	ORDER BY COUNT(*) DESC
-	LIMIT 50
-	;
-	`
-	artistRows, err := db.Query(artistQueryString, user, start.Unix(), end.Unix())
-	if err != nil {
-		return fmt.Errorf("querying artists: %w", err)
-	}
-	defer artistRows.Close()
-
-	fmt.Println("## Top 50 Artists")
-	i := 1
-	for artistRows.Next() {
-		var name string
-		var count int64
-		if err := artistRows.Scan(&name, &count); err != nil {
-			return fmt.Errorf("scanning artist: %w", err)
+	if limitArtists > 0 {
+		const artistQueryString = `
+		SELECT Track.artist, COUNT(Listen.id)
+		FROM Listen
+		INNER JOIN Track ON Track.id = Listen.track
+		WHERE user = ?
+		AND Listen.date BETWEEN ? AND ?
+		GROUP BY Track.artist
+		ORDER BY COUNT(*) DESC
+		LIMIT ?
+		;
+		`
+		artistRows, err := db.Query(artistQueryString, user, start.Unix(), end.Unix(), limitArtists)
+		if err != nil {
+			return fmt.Errorf("querying artists: %w", err)
 		}
-		fmt.Printf("%d. %s (%d)\n", i, name, count)
-		i++
+		defer artistRows.Close()
+
+		fmt.Printf("## Top %d Artists\n", limitArtists)
+		i := 1
+		for artistRows.Next() {
+			var name string
+			var count int64
+			if err := artistRows.Scan(&name, &count); err != nil {
+				return fmt.Errorf("scanning artist: %w", err)
+			}
+			fmt.Printf("%d. %s (%d)\n", i, name, count)
+			i++
+		}
+		fmt.Println()
 	}
-	fmt.Println()
 
 	// 3. Top Albums
-	const albumQueryString = `
-	SELECT Track.artist, Track.album, COUNT(Listen.id)
-	FROM Listen
-	INNER JOIN Track ON Track.id = Listen.track
-	WHERE user = ?
-	AND Listen.date BETWEEN ? AND ?
-	GROUP BY Track.artist, Track.album
-	ORDER BY COUNT(*) DESC
-	LIMIT 50
-	;
-	`
-	albumRows, err := db.Query(albumQueryString, user, start.Unix(), end.Unix())
-	if err != nil {
-		return fmt.Errorf("querying albums: %w", err)
-	}
-	defer albumRows.Close()
-
-	fmt.Println("## Top 50 Albums")
-	i = 1
-	for albumRows.Next() {
-		var artist, album string
-		var count int64
-		if err := albumRows.Scan(&artist, &album, &count); err != nil {
-			return fmt.Errorf("scanning album: %w", err)
+	if limitAlbums > 0 {
+		const albumQueryString = `
+		SELECT Track.artist, Track.album, COUNT(Listen.id)
+		FROM Listen
+		INNER JOIN Track ON Track.id = Listen.track
+		WHERE user = ?
+		AND Listen.date BETWEEN ? AND ?
+		GROUP BY Track.artist, Track.album
+		ORDER BY COUNT(*) DESC
+		LIMIT ?
+		;
+		`
+		albumRows, err := db.Query(albumQueryString, user, start.Unix(), end.Unix(), limitAlbums)
+		if err != nil {
+			return fmt.Errorf("querying albums: %w", err)
 		}
-		fmt.Printf("%d. %s - %s (%d)\n", i, album, artist, count)
-		i++
+		defer albumRows.Close()
+
+		fmt.Printf("## Top %d Albums\n", limitAlbums)
+		i := 1
+		for albumRows.Next() {
+			var artist, album string
+			var count int64
+			if err := albumRows.Scan(&artist, &album, &count); err != nil {
+				return fmt.Errorf("scanning album: %w", err)
+			}
+			fmt.Printf("%d. %s - %s (%d)\n", i, album, artist, count)
+			i++
+		}
+		fmt.Println()
+	}
+
+	// 4. Top Tracks
+	if limitTracks > 0 {
+		const trackQueryString = `
+		SELECT Track.name, Track.artist, COUNT(Listen.id)
+		FROM Listen
+		INNER JOIN Track ON Track.id = Listen.track
+		WHERE user = ?
+		AND Listen.date BETWEEN ? AND ?
+		GROUP BY Track.name, Track.artist
+		ORDER BY COUNT(*) DESC
+		LIMIT ?
+		;
+		`
+		trackRows, err := db.Query(trackQueryString, user, start.Unix(), end.Unix(), limitTracks)
+		if err != nil {
+			return fmt.Errorf("querying tracks: %w", err)
+		}
+		defer trackRows.Close()
+
+		fmt.Printf("## Top %d Tracks\n", limitTracks)
+		i := 1
+		for trackRows.Next() {
+			var name, artist string
+			var count int64
+			if err := trackRows.Scan(&name, &artist, &count); err != nil {
+				return fmt.Errorf("scanning track: %w", err)
+			}
+			fmt.Printf("%d. %s - %s (%d)\n", i, name, artist, count)
+			i++
+		}
+		fmt.Println()
 	}
 
 	return nil
