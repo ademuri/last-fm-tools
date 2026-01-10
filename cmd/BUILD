@@ -14,7 +14,7 @@ go_library(
         "newArtists.go",
         "root.go",
         "sendReports.go",
-        "tasteReport.go",
+        "topN.go",
         "topAlbums.go",
         "topArtists.go",
         "update.go",

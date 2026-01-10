@@ -29,13 +29,13 @@ var (
 	limitTracks  int
 )
 
-var tasteReportCmd = &cobra.Command{
-	Use:   "taste-report [from] [to (optional)]",
+var topNCmd = &cobra.Command{
+	Use:   "top-n [from] [to (optional)]",
 	Short: "Generates a textual summary of music taste",
 	Long:  `Generates a comprehensive report including top artists and albums over a specified period.`,
 	Args:  cobra.RangeArgs(1, 2),
 	Run: func(cmd *cobra.Command, args []string) {
-		err := printTasteReport(viper.GetString("database"), args)
+		err := printTopN(viper.GetString("database"), args)
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)
@@ -44,13 +44,13 @@ var tasteReportCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(tasteReportCmd)
-	tasteReportCmd.Flags().IntVar(&limitArtists, "artists", 10, "Number of top artists to show")
-	tasteReportCmd.Flags().IntVar(&limitAlbums, "albums", 10, "Number of top albums to show")
-	tasteReportCmd.Flags().IntVar(&limitTracks, "tracks", 10, "Number of top tracks to show")
+	rootCmd.AddCommand(topNCmd)
+	topNCmd.Flags().IntVar(&limitArtists, "artists", 10, "Number of top artists to show")
+	topNCmd.Flags().IntVar(&limitAlbums, "albums", 10, "Number of top albums to show")
+	topNCmd.Flags().IntVar(&limitTracks, "tracks", 10, "Number of top tracks to show")
 }
 
-func printTasteReport(dbPath string, args []string) error {
+func printTopN(dbPath string, args []string) error {
 	start, end, err := parseDateRangeFromArgs(args)
 	if err != nil {
 		return err
