@@ -1,3 +1,6 @@
 /bazel-*
 secrets.go
 *.db
+
+# Config file. Contains auth secrets.
+last-fm-tools.yaml
