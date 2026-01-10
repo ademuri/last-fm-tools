@@ -1,5 +1,5 @@
-# Use a recent Ubuntu base for compatibility
-FROM ubuntu:24.04
+# Ensure that the image has a recent version of Node for Gemini
+FROM node:20-bookworm-slim
 
 # Prevent interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
