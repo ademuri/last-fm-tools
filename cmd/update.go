@@ -556,7 +556,7 @@ func updateArtistTags(db *sql.DB, client *lastfm.Api, limiter *rate.Limiter) err
 					return fmt.Errorf("inserting tag %s: %w", tag.Name, err)
 				}
 
-				_, err = tx.Exec("INSERT INTO ArtistTag (artist, tag, count) VALUES (?, ?, ?)", artist, tag.Name, tag.Count)
+				_, err = tx.Exec("INSERT OR REPLACE INTO ArtistTag (artist, tag, count) VALUES (?, ?, ?)", artist, tag.Name, tag.Count)
 				if err != nil {
 					tx.Rollback()
 					return fmt.Errorf("inserting artist tag %s - %s: %w", artist, tag.Name, err)
@@ -649,7 +649,7 @@ func updateAlbumTags(db *sql.DB, client *lastfm.Api, limiter *rate.Limiter) erro
 					return fmt.Errorf("inserting tag %s: %w", tag.Name, err)
 				}
 
-				_, err = tx.Exec("INSERT INTO AlbumTag (artist, album, tag, count) VALUES (?, ?, ?, ?)", alb.artist, alb.name, tag.Name, tag.Count)
+				_, err = tx.Exec("INSERT OR REPLACE INTO AlbumTag (artist, album, tag, count) VALUES (?, ?, ?, ?)", alb.artist, alb.name, tag.Name, tag.Count)
 				if err != nil {
 					tx.Rollback()
 					return fmt.Errorf("inserting album tag %s - %s - %s: %w", alb.artist, alb.name, tag.Name, err)
