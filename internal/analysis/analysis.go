@@ -4,7 +4,9 @@ import (
 	"database/sql"
 	"fmt"
 	"math"
+	"regexp"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -325,56 +327,217 @@ func getTopTagsForAlbum(db *sql.DB, artist, album string, limit int) ([]string, 
 	return tags, nil
 }
 
+var yearRegex = regexp.MustCompile(`^\d{4}$`)
+
+func filterTags(tags []string, counts []int) []string {
+	validTags := []string{}
+	for i, t := range tags {
+		// 1. Weight >= 25
+		if counts[i] < 25 {
+			continue
+		}
+		
+		// 4. Normalize
+		normalized := strings.ToLower(t)
+		normalized = strings.ReplaceAll(normalized, "-", " ")
+		normalized = strings.ReplaceAll(normalized, "_", " ")
+		normalized = strings.TrimSpace(normalized)
+
+		// 2. Discard year pattern
+		if yearRegex.MatchString(normalized) {
+			continue
+		}
+		
+		// 3. Length < 3
+		if len(normalized) < 3 {
+			continue
+		}
+
+		validTags = append(validTags, normalized)
+	}
+	return validTags
+}
+
 func getTopTagsWeighted(db *sql.DB, user string, start, end time.Time, limit int) ([]TagStat, error) {
-	// Aggregating tags based on listen count.
-	// We simplify by joining Listen -> Track -> ArtistTag (since ArtistTags are more populated than AlbumTags usually)
-	// and Listen -> Track -> AlbumTag.
+	// 1. Fetch all Artist Tags
+	artistTagsMap := make(map[string][]string)
+	rows, err := db.Query("SELECT artist, tag, count FROM ArtistTag")
+	if err != nil {
+		return nil, err
+	}
 	
+	var currentArtist string
+	var currentTags []string
+	var currentCounts []int
+	
+	for rows.Next() {
+		var a, t string
+		var c int
+		if err := rows.Scan(&a, &t, &c); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		
+		if a != currentArtist {
+			if currentArtist != "" {
+				valid := filterTags(currentTags, currentCounts)
+				if len(valid) >= 2 {
+					artistTagsMap[currentArtist] = valid
+				}
+			}
+			currentArtist = a
+			currentTags = []string{}
+			currentCounts = []int{}
+		}
+		currentTags = append(currentTags, t)
+		currentCounts = append(currentCounts, c)
+	}
+	// Process last
+	if currentArtist != "" {
+		valid := filterTags(currentTags, currentCounts)
+		if len(valid) >= 2 {
+			artistTagsMap[currentArtist] = valid
+		}
+	}
+	rows.Close()
+
+	// 2. Fetch all Album Tags
+	type albumKey struct {
+		artist, album string
+	}
+	albumTagsMap := make(map[albumKey][]string)
+	
+	rows, err = db.Query("SELECT artist, album, tag, count FROM AlbumTag ORDER BY artist, album")
+	if err != nil {
+		return nil, err
+	}
+	
+	var currentAlbumKey albumKey
+	currentTags = []string{}
+	currentCounts = []int{}
+	
+	for rows.Next() {
+		var a, alb, t string
+		var c int
+		if err := rows.Scan(&a, &alb, &t, &c); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		
+		key := albumKey{a, alb}
+		if key != currentAlbumKey {
+			if currentAlbumKey.artist != "" {
+				valid := filterTags(currentTags, currentCounts)
+				if len(valid) >= 2 {
+					albumTagsMap[currentAlbumKey] = valid
+				}
+			}
+			currentAlbumKey = key
+			currentTags = []string{}
+			currentCounts = []int{}
+		}
+		currentTags = append(currentTags, t)
+		currentCounts = append(currentCounts, c)
+	}
+	// Process last
+	if currentAlbumKey.artist != "" {
+		valid := filterTags(currentTags, currentCounts)
+		if len(valid) >= 2 {
+			albumTagsMap[currentAlbumKey] = valid
+		}
+	}
+	rows.Close()
+
+	// 3. Iterate Listens and Accumulate Weights
 	query := `
-		SELECT name, SUM(weight) as total_weight
-		FROM (
-			SELECT at.tag as name, COUNT(*) as weight
-			FROM Listen l
-			JOIN Track t ON l.track = t.id
-			JOIN ArtistTag at ON t.artist = at.artist
-			WHERE l.user = ? AND l.date BETWEEN ? AND ?
-			GROUP BY at.tag
-		)
-		GROUP BY name
-		ORDER BY total_weight DESC
-		LIMIT ?
+		SELECT t.artist, t.album, COUNT(*)
+		FROM Listen l
+		JOIN Track t ON l.track = t.id
+		WHERE l.user = ? AND l.date BETWEEN ? AND ?
+		GROUP BY t.artist, t.album
 	`
-	// Note: We are only using Artist tags here for simplicity and performance, and because Album tags are sparse.
-	// If we want both, we'd need a UNION. Let's start with Artist tags as they are the primary driver of "Taste".
-	
-	rows, err := db.Query(query, user, start.Unix(), end.Unix(), limit)
+	rows, err = db.Query(query, user, start.Unix(), end.Unix())
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var rawStats []TagStat
-	var totalWeight float64
+	globalTagCounts := make(map[string]int64)
+	var totalWeight int64
 
 	for rows.Next() {
-		var t TagStat
-		if err := rows.Scan(&t.Tag, &t.Weight); err != nil {
+		var artist, album string
+		var count int64
+		if err := rows.Scan(&artist, &album, &count); err != nil {
 			return nil, err
 		}
-		rawStats = append(rawStats, t)
-		totalWeight += t.Weight
-	}
 
-	// Normalize
-	if totalWeight > 0 {
-		for i := range rawStats {
-			rawStats[i].Weight = rawStats[i].Weight / totalWeight
-			// Round to 2 decimals
-			rawStats[i].Weight = math.Round(rawStats[i].Weight*100) / 100
+		// Gather unique tags for this listen context
+		uniqueTags := make(map[string]bool)
+		
+		// Add artist tags
+		if tags, ok := artistTagsMap[artist]; ok {
+			for _, t := range tags {
+				uniqueTags[t] = true
+			}
+		}
+		
+		// Add album tags
+		if tags, ok := albumTagsMap[albumKey{artist, album}]; ok {
+			for _, t := range tags {
+				uniqueTags[t] = true
+			}
+		}
+		
+		// Add to global
+		for t := range uniqueTags {
+			globalTagCounts[t] += count
+			totalWeight += count
 		}
 	}
 
-	return rawStats, nil
+	// 4. Convert to TagStat and Sort
+	var stats []TagStat
+	for tag, weight := range globalTagCounts {
+		stats = append(stats, TagStat{Tag: tag, Weight: float64(weight)})
+	}
+	
+	sort.Slice(stats, func(i, j int) bool {
+		return stats[i].Weight > stats[j].Weight
+	})
+	
+	if len(stats) > limit {
+		stats = stats[:limit]
+	}
+
+	// Normalize (relative frequency 0-1 based on total tag-assignments)
+	// Or relative to the max? Prompt example says "normalized 0-1, relative frequency".
+	// Example: tag: "electronic", weight: 0.85. 
+	// If it's relative frequency, sum should be 1.0 (or close).
+	// But 0.85 + 0.72 > 1.0. So it's likely normalized against the *Top Tag* or just a score.
+	// Prompt says: "normalized 0-1, relative frequency". 
+	// Let's interpret as: weight / total_scrobbles? Or weight / max_weight?
+	// If "electronic" is 0.85, it means 85% of listens had this tag? That makes sense.
+	// So we normalize by Total Scrobbles in the period? No, total scrobbles *that had tags*?
+	// Let's normalize by Total Scrobbles in period (approximate).
+	// Actually, let's normalize by the count of the top tag? No, 0.85 implies percentage.
+	// Let's divide by Total Scrobbles in the period.
+	
+	totalScrobblesPeriod := int64(0)
+	err = db.QueryRow("SELECT COUNT(*) FROM Listen WHERE user = ? AND date BETWEEN ? AND ?", user, start.Unix(), end.Unix()).Scan(&totalScrobblesPeriod)
+	if err != nil {
+		// Fallback
+		totalScrobblesPeriod = 1
+	}
+
+	for i := range stats {
+		if totalScrobblesPeriod > 0 {
+			stats[i].Weight = stats[i].Weight / float64(totalScrobblesPeriod)
+			stats[i].Weight = math.Round(stats[i].Weight*100) / 100
+		}
+	}
+
+	return stats, nil
 }
 
 func getArtistListenCount(db *sql.DB, user, artist string, start, end time.Time) (int64, error) {
@@ -547,9 +710,9 @@ func calculateListeningPatterns(db *sql.DB, user string, start, end time.Time) (
 		}
 	}
 
-	// New artists in past 12 months
+	// Discovery Rate (Last 12 months)
 	// Count artists whose First Listen is > (Now - 12m)
-	newArtistsStart := time.Now().AddDate(-1, 0, 0)
+	discoveryStart := time.Now().AddDate(-1, 0, 0)
 	queryDisc := `
 		SELECT COUNT(*) FROM (
 			SELECT t.artist, MIN(l.date) as first_listen
@@ -559,7 +722,7 @@ func calculateListeningPatterns(db *sql.DB, user string, start, end time.Time) (
 			HAVING first_listen >= ?
 		)
 	`
-	db.QueryRow(queryDisc, user, newArtistsStart.Unix()).Scan(&lp.NewArtistsInLast12Months)
+	db.QueryRow(queryDisc, user, discoveryStart.Unix()).Scan(&lp.ArtistDiscoveryRate)
 
 	// Repeat Ratio
 	// (TotalScrobbles - UniqueArtists) / TotalScrobbles

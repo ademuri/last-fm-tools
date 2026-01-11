@@ -54,9 +54,18 @@ func TestGenerateReport(t *testing.T) {
 	}
 
 	// 5. Tags
+	// New logic requires 2+ valid tags per artist/album to be included.
 	db.Exec("INSERT INTO Tag (name) VALUES (?)", "Rock")
+	db.Exec("INSERT INTO Tag (name) VALUES (?)", "Indie")
+	db.Exec("INSERT INTO Tag (name) VALUES (?)", "Alternative")
+	
+	// Artist A: Rock (100), Indie (80) -> Valid
 	db.Exec("INSERT INTO ArtistTag (artist, tag, count) VALUES (?, ?, ?)", "Artist A", "Rock", 100)
+	db.Exec("INSERT INTO ArtistTag (artist, tag, count) VALUES (?, ?, ?)", "Artist A", "Indie", 80)
+	
+	// Artist B: Rock (50), Alternative (30) -> Valid
 	db.Exec("INSERT INTO ArtistTag (artist, tag, count) VALUES (?, ?, ?)", "Artist B", "Rock", 50)
+	db.Exec("INSERT INTO ArtistTag (artist, tag, count) VALUES (?, ?, ?)", "Artist B", "Alternative", 30)
 
 	report, err := GenerateReport(db, user)
 	if err != nil {
@@ -78,6 +87,13 @@ func TestGenerateReport(t *testing.T) {
 	} else if report.HistoricalBaseline.TopArtists[0].Name != "Artist B" {
 		t.Errorf("expected Artist B to be top historical artist, got %s", report.HistoricalBaseline.TopArtists[0].Name)
 	}
+	
+	// Check tag weighting logic (Artist A has 10 listens in current period)
+	// Artist A tags: rock, indie.
+	// So Rock should have weight based on 10 listens.
+	if len(report.CurrentTaste.TopTags) == 0 {
+		t.Errorf("expected current tags")
+	}
 }
 
 func TestGetPeakYears(t *testing.T) {
@@ -87,16 +103,6 @@ func TestGetPeakYears(t *testing.T) {
 	user := "testuser"
 	artist := "Artist A"
 	db.Exec("INSERT INTO Track (id, name, artist, album) VALUES (1, 'T', ?, 'A')", artist)
-
-	// 10 listens in 2020, 10 in 2021, 10 in 2022
-	// Total 30. 80% is 24.
-	// Any 3 year range will have 30.
-	// Shortest range containing 24? 
-	// 2020: 10
-	// 2021: 10
-	// 2022: 10
-	// Range 2020-2022 has 30. 2020-2021 has 20. 2021-2022 has 20.
-	// So 2020-2022 is shortest range >= 24.
 
 	years := []int{2020, 2021, 2022}
 	for _, y := range years {
