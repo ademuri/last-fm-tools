@@ -13,12 +13,14 @@
 -- limitations under the License.
 
 CREATE TABLE Artist (
-  name TEXT PRIMARY KEY
+  name TEXT PRIMARY KEY,
+  tags_last_updated DATETIME
 );
 
 CREATE TABLE Album (
   name TEXT,
   artist TEXT,
+  tags_last_updated DATETIME,
   FOREIGN KEY (artist) REFERENCES Artist(name),
   CONSTRAINT PK_Album PRIMARY KEY (artist, name)
 );
