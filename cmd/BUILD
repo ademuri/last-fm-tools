@@ -12,6 +12,7 @@ go_library(
         "listReports.go",
         "newAlbums.go",
         "newArtists.go",
+        "report.go",
         "root.go",
         "sendReports.go",
         "topN.go",
@@ -22,6 +23,7 @@ go_library(
     importpath = "github.com/ademuri/last-fm-tools/cmd",
     visibility = ["//visibility:public"],
     deps = [
+        "//internal/analysis:go_default_library",
         "//internal/migration:go_default_library",
         "@com_github_ademuri_lastfm_go//lastfm:go_default_library",
         "@com_github_avast_retry_go//:go_default_library",
@@ -31,6 +33,7 @@ go_library(
         "@com_github_spf13_cobra//:go_default_library",
         "@com_github_spf13_pflag//:go_default_library",
         "@com_github_spf13_viper//:go_default_library",
+        "@in_gopkg_yaml_v3//:go_default_library",
         "@org_golang_x_time//rate:go_default_library",
     ],
 )
