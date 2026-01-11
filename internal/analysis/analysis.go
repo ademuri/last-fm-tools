@@ -163,8 +163,14 @@ func GenerateReport(db *sql.DB, user string) (*Report, error) {
 	report.ListeningPatterns = lp
 
 	// Calculate Listening Style (Profile Metadata) based on patterns
-	// Heuristic: If AlbumsPerArtistMedian > 3 or Average > 4, "album-oriented". Else "playlist-oriented".
-	if lp.AlbumsPerArtistMedian >= 2.0 { // 2 albums per artist is decent depth
+	// Heuristic: "Tracks per Album" is a better indicator of style than "Albums per Artist".
+	// If avg tracks per album > 3.0, likely album-oriented.
+	avgTracksPerAlbum, err := getAverageTracksPerAlbum(db, user, currentStart, currentEnd)
+	if err != nil {
+		return nil, fmt.Errorf("getting avg tracks per album: %w", err)
+	}
+
+	if avgTracksPerAlbum >= 3.0 {
 		report.Metadata.ListeningStyle = "album-oriented"
 	} else {
 		report.Metadata.ListeningStyle = "track-oriented"
@@ -174,6 +180,37 @@ func GenerateReport(db *sql.DB, user string) (*Report, error) {
 }
 
 // -- Helpers --
+
+func getAverageTracksPerAlbum(db *sql.DB, user string, start, end time.Time) (float64, error) {
+	query := `
+		SELECT COUNT(DISTINCT t.id)
+		FROM Listen l
+		JOIN Track t ON l.track = t.id
+		WHERE l.user = ? AND l.date BETWEEN ? AND ? AND t.album != ''
+		GROUP BY t.artist, t.album
+	`
+	rows, err := db.Query(query, user, start.Unix(), end.Unix())
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+
+	var countSum int64
+	var albumCount int64
+	for rows.Next() {
+		var c int64
+		if err := rows.Scan(&c); err != nil {
+			return 0, err
+		}
+		countSum += c
+		albumCount++
+	}
+
+	if albumCount == 0 {
+		return 0, nil
+	}
+	return float64(countSum) / float64(albumCount), nil
+}
 
 func getLatestListen(db *sql.DB, user string) (time.Time, error) {
 	var date int64

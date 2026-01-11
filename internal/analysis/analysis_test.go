@@ -45,21 +45,53 @@ func TestGenerateReport(t *testing.T) {
 	db.Exec("INSERT INTO Track (id, name, artist, album) VALUES (1, 'Track 1', 'Artist A', 'Album A1')")
 	db.Exec("INSERT INTO Track (id, name, artist, album) VALUES (2, 'Track 2', 'Artist B', 'Album B1')")
 	db.Exec("INSERT INTO Track (id, name, artist, album) VALUES (3, 'Track 3', 'Artist C', 'Album C1')")
+	// Add more tracks to Album A1 to trigger "album-oriented" (Avg tracks > 3)
+	db.Exec("INSERT INTO Track (id, name, artist, album) VALUES (4, 'Track 4', 'Artist A', 'Album A1')")
+	db.Exec("INSERT INTO Track (id, name, artist, album) VALUES (5, 'Track 5', 'Artist A', 'Album A1')")
+	db.Exec("INSERT INTO Track (id, name, artist, album) VALUES (6, 'Track 6', 'Artist A', 'Album A1')")
 
 	// 4. Listens
 	now := time.Now().Unix()
 	longAgo := time.Now().AddDate(-2, 0, 0).Unix()
 
 	// Current listens
-	for i := 0; i < 10; i++ {
-		db.Exec("INSERT INTO Listen (user, track, date) VALUES (?, 1, ?)", user, now-int64(i*3600))
-	}
+	// Listen to Album A1 (4 tracks)
+	db.Exec("INSERT INTO Listen (user, track, date) VALUES (?, 1, ?)", user, now-100)
+	db.Exec("INSERT INTO Listen (user, track, date) VALUES (?, 4, ?)", user, now-200)
+	db.Exec("INSERT INTO Listen (user, track, date) VALUES (?, 5, ?)", user, now-300)
+	db.Exec("INSERT INTO Listen (user, track, date) VALUES (?, 6, ?)", user, now-400)
+	// Listen to Album B1 (1 track)
+	db.Exec("INSERT INTO Listen (user, track, date) VALUES (?, 2, ?)", user, now-500)
+	// Listen to Album C1 (1 track)
+	db.Exec("INSERT INTO Listen (user, track, date) VALUES (?, 3, ?)", user, now-600)
+
+	// Avg tracks/album: (4 + 1 + 1) / 3 = 2.0. Still track oriented? 
+	// Wait, threshold is 3.0. 
+	// Let's add more tracks to A1.
+	db.Exec("INSERT INTO Track (id, name, artist, album) VALUES (7, 'Track 7', 'Artist A', 'Album A1')")
+	db.Exec("INSERT INTO Track (id, name, artist, album) VALUES (8, 'Track 8', 'Artist A', 'Album A1')")
+	db.Exec("INSERT INTO Listen (user, track, date) VALUES (?, 7, ?)", user, now-700)
+	db.Exec("INSERT INTO Listen (user, track, date) VALUES (?, 8, ?)", user, now-800)
+	
+	// Avg: (6 + 1 + 1) / 3 = 2.66. Still under 3.0.
+	// Let's add Album A2 with 5 tracks.
+	db.Exec("INSERT INTO Album (artist, name) VALUES (?, ?)", "Artist A", "Album A2")
+	db.Exec("INSERT INTO Track (id, name, artist, album) VALUES (11, 'T1', 'Artist A', 'Album A2')")
+	db.Exec("INSERT INTO Track (id, name, artist, album) VALUES (12, 'T2', 'Artist A', 'Album A2')")
+	db.Exec("INSERT INTO Track (id, name, artist, album) VALUES (13, 'T3', 'Artist A', 'Album A2')")
+	db.Exec("INSERT INTO Track (id, name, artist, album) VALUES (14, 'T4', 'Artist A', 'Album A2')")
+	db.Exec("INSERT INTO Listen (user, track, date) VALUES (?, 11, ?)", user, now-1000)
+	db.Exec("INSERT INTO Listen (user, track, date) VALUES (?, 12, ?)", user, now-1100)
+	db.Exec("INSERT INTO Listen (user, track, date) VALUES (?, 13, ?)", user, now-1200)
+	db.Exec("INSERT INTO Listen (user, track, date) VALUES (?, 14, ?)", user, now-1300)
+
+	// Albums: A1 (6 tracks), B1 (1 track), C1 (1 track), A2 (4 tracks)
+	// Avg: (6+1+1+4)/4 = 3.0 -> Album Oriented.
+	
 	// Historical listens
 	for i := 0; i < 5; i++ {
 		db.Exec("INSERT INTO Listen (user, track, date) VALUES (?, 2, ?)", user, longAgo-int64(i*3600))
 	}
-	// Listens for artist with no tags
-	db.Exec("INSERT INTO Listen (user, track, date) VALUES (?, 3, ?)", user, now)
 
 	// 5. Tags
 	db.Exec("INSERT INTO Tag (name) VALUES (?)", "Rock")
@@ -83,6 +115,20 @@ func TestGenerateReport(t *testing.T) {
 	report, err := GenerateReport(db, user)
 	if err != nil {
 		t.Fatalf("GenerateReport failed: %v", err)
+	}
+
+	if report.Metadata.TotalScrobbles != 17 { // 12 current + 5 historical
+		t.Errorf("expected 17 scrobbles, got %d", report.Metadata.TotalScrobbles)
+	}
+
+	if report.Metadata.ListeningStyle != "album-oriented" {
+		t.Errorf("expected album-oriented style, got %s", report.Metadata.ListeningStyle)
+	}
+
+	if len(report.CurrentTaste.TopArtists) == 0 {
+		t.Errorf("expected at least one current artist")
+	} else if report.CurrentTaste.TopArtists[0].Name != "Artist A" {
+		t.Errorf("expected Artist A to be top current artist, got %s", report.CurrentTaste.TopArtists[0].Name)
 	}
 
 	// Verify Artist C (no tags) is handled
