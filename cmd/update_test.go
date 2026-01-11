@@ -124,3 +124,58 @@ func TestCreateDatabaseAndData(t *testing.T) {
 		t.Fatalf("commiting transaction: %w", err)
 	}
 }
+
+func TestGetLatestListenWithBadDate(t *testing.T) {
+	db, err := createTestDb()
+	if err != nil {
+		t.Fatalf("createTestDb() error: %w", err)
+	}
+	defer db.Close()
+
+	user := "reproUser"
+	err = createUser(db, user)
+	if err != nil {
+		t.Fatalf("createUser: %v", err)
+	}
+
+	tx, err := db.Begin()
+	if err != nil {
+		t.Fatalf("db.Begin: %v", err)
+	}
+
+	createArtist(tx, "Artist")
+	createAlbum(tx, "Artist", "Album")
+	trackID, err := createTrack(tx, "Artist", "Album", "Track")
+	if err != nil {
+		t.Fatalf("createTrack: %v", err)
+	}
+
+	// Insert bad date (Text, which sorts > Integer in SQLite)
+	badDate := "0001-01-01T00:00:00Z"
+	err = createListen(tx, user, trackID, badDate)
+	if err != nil {
+		t.Fatalf("createListen failed: %v", err)
+	}
+
+	// Insert good date (Unix Timestamp)
+	// 1593490750 = 2020-06-30...
+	goodDate := "1593490750"
+	err = createListen(tx, user, trackID, goodDate)
+	if err != nil {
+		t.Fatalf("createListen failed: %v", err)
+	}
+
+	tx.Commit()
+
+	// Attempt to get latest listen
+	date, err := getLatestListen(db, user)
+	if err != nil {
+		t.Fatalf("getLatestListen failed: %v", err)
+	}
+
+	// Check if date is the good date
+	// 1593490750
+	if date.Year() != 2020 {
+		t.Errorf("Expected year 2020, got %v", date)
+	}
+}

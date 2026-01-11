@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -160,14 +160,16 @@ func updateDatabase(config UpdateConfig) error {
 		if err != nil {
 			return fmt.Errorf("updateDatabase: %w", err)
 		}
-		fmt.Printf("Downloaded page %v of %v\n", page, pages)
-		page += 1
 
 		oldestDateUts, err := strconv.ParseInt(recent_tracks.Tracks[len(recent_tracks.Tracks)-1].Date.Uts, 10, 64)
 		if err != nil {
 			return fmt.Errorf("updateDatabase: %w", err)
 		}
 		oldestDate := time.Unix(oldestDateUts, 0)
+
+		fmt.Printf("Downloaded page %v of %v (oldest: %s)\n", page, pages, oldestDate.Format("2006-01-02"))
+		page += 1
+
 		if !after.IsZero() && oldestDate.Before(after) {
 			break
 		}
@@ -408,7 +410,9 @@ func createListen(db *sql.Tx, user string, track_id int64, datetime string) (err
 }
 
 func getLatestListen(db *sql.DB, user string) (date time.Time, err error) {
-	query, err := db.Query("SELECT date FROM Listen WHERE user = ? ORDER BY Date desc LIMIT 1", user)
+	// Cast date to integer for sorting. SQLite sorts Text > Integer.
+	// We want to prioritize real timestamps (integers) over garbage text dates.
+	query, err := db.Query("SELECT date FROM Listen WHERE user = ? ORDER BY CAST(date AS INTEGER) desc LIMIT 1", user)
 	if err != nil {
 		err = fmt.Errorf("getLatestListen(%q): %w", user, err)
 		return
@@ -428,11 +432,18 @@ func getLatestListen(db *sql.DB, user string) (date time.Time, err error) {
 
 	dateInt, err := strconv.ParseInt(dateStr, 10, 64)
 	if err != nil {
-		err = fmt.Errorf("getLatestListen(%q): parsing date %q: %w", user, dateStr, err)
-		return
+		// Try parsing as ISO8601
+		var t time.Time
+		t, err2 := time.Parse(time.RFC3339, dateStr)
+		if err2 != nil {
+			err = fmt.Errorf("getLatestListen(%q): parsing date %q: %w (and as RFC3339: %v)", user, dateStr, err, err2)
+			return
+		}
+		date = t
+		err = nil
+	} else {
+		date = time.Unix(dateInt, 0)
 	}
-
-	date = time.Unix(dateInt, 0)
 	return
 }
 
