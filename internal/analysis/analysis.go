@@ -106,14 +106,11 @@ func GenerateReport(db *sql.DB, user string) (*Report, error) {
 		}
 		historicalArtists[i].PeakYears = years
 
-		inCurrent := false
-		for _, ca := range currentArtists {
-			if ca.Name == historicalArtists[i].Name {
-				inCurrent = true
-				break
-			}
+		count, err := getArtistListenCount(db, user, historicalArtists[i].Name, currentStart, currentEnd)
+		if err != nil {
+			return nil, err
 		}
-		historicalArtists[i].InCurrentTaste = inCurrent
+		historicalArtists[i].InCurrentTaste = count > 0
 
 		tags, err := getTopTagsForArtist(db, historicalArtists[i].Name, 3)
 		if err != nil {
