@@ -35,6 +35,8 @@ func TestGenerateReport(t *testing.T) {
 	// 2. Artists
 	db.Exec("INSERT INTO Artist (name) VALUES (?)", "Artist A")
 	db.Exec("INSERT INTO Artist (name) VALUES (?)", "Artist B")
+	db.Exec("INSERT INTO Album (artist, name) VALUES (?, ?)", "Artist A", "Album A1")
+	db.Exec("INSERT INTO Album (artist, name) VALUES (?, ?)", "Artist B", "Album B1")
 
 	// 3. Tracks
 	db.Exec("INSERT INTO Track (id, name, artist, album) VALUES (1, 'Track 1', 'Artist A', 'Album A1')")
@@ -54,10 +56,11 @@ func TestGenerateReport(t *testing.T) {
 	}
 
 	// 5. Tags
-	// New logic requires 2+ valid tags per artist/album to be included.
 	db.Exec("INSERT INTO Tag (name) VALUES (?)", "Rock")
 	db.Exec("INSERT INTO Tag (name) VALUES (?)", "Indie")
 	db.Exec("INSERT INTO Tag (name) VALUES (?)", "Alternative")
+	db.Exec("INSERT INTO Tag (name) VALUES (?)", "Pop") // For album tag
+	db.Exec("INSERT INTO Tag (name) VALUES (?)", "Cool") // For album tag
 	
 	// Artist A: Rock (100), Indie (80) -> Valid
 	db.Exec("INSERT INTO ArtistTag (artist, tag, count) VALUES (?, ?, ?)", "Artist A", "Rock", 100)
@@ -66,6 +69,10 @@ func TestGenerateReport(t *testing.T) {
 	// Artist B: Rock (50), Alternative (30) -> Valid
 	db.Exec("INSERT INTO ArtistTag (artist, tag, count) VALUES (?, ?, ?)", "Artist B", "Rock", 50)
 	db.Exec("INSERT INTO ArtistTag (artist, tag, count) VALUES (?, ?, ?)", "Artist B", "Alternative", 30)
+
+	// Album Tags for Album A1 -> Valid
+	db.Exec("INSERT INTO AlbumTag (artist, album, tag, count) VALUES (?, ?, ?, ?)", "Artist A", "Album A1", "Pop", 60)
+	db.Exec("INSERT INTO AlbumTag (artist, album, tag, count) VALUES (?, ?, ?, ?)", "Artist A", "Album A1", "Cool", 40)
 
 	report, err := GenerateReport(db, user)
 	if err != nil {
@@ -88,11 +95,76 @@ func TestGenerateReport(t *testing.T) {
 		t.Errorf("expected Artist B to be top historical artist, got %s", report.HistoricalBaseline.TopArtists[0].Name)
 	}
 	
-	// Check tag weighting logic (Artist A has 10 listens in current period)
-	// Artist A tags: rock, indie.
-	// So Rock should have weight based on 10 listens.
-	if len(report.CurrentTaste.TopTags) == 0 {
-		t.Errorf("expected current tags")
+	// Check tag weighting logic
+	// Artist A (10 listens) has Artist tags: Rock, Indie. Album tags: Pop, Cool.
+	// All should be present.
+	foundPop := false
+	for _, t := range report.CurrentTaste.TopTags {
+		if t.Tag == "pop" { // Normalized to lower
+			foundPop = true
+			break
+		}
+	}
+	if !foundPop {
+		t.Errorf("expected 'pop' tag from album tags to be present in current taste")
+	}
+}
+
+func TestFilterTags(t *testing.T) {
+	tags := []string{"Valid1", "Valid2", "1999", "Tiny", "LowWeight", "With-Hyphen", "With_Underscore"}
+	counts := []int{100, 50, 100, 100, 10, 100, 100}
+	
+	filtered := filterTags(tags, counts)
+	
+	// Expectations:
+	// "Valid1" -> "valid1"
+	// "Valid2" -> "valid2"
+	// "1999" -> Rejected (year)
+	// "Tiny" -> "tiny" (Length 4 >= 3) -> OK
+	// "LowWeight" -> Rejected (count 10 < 25)
+	// "With-Hyphen" -> "with hyphen"
+	// "With_Underscore" -> "with underscore"
+	
+	// Actually, let's verify exact contents.
+	expected := []string{"valid1", "valid2", "tiny", "with hyphen", "with underscore"}
+	
+	if len(filtered) != len(expected) {
+		t.Errorf("expected %d tags, got %d: %v", len(expected), len(filtered), filtered)
+	}
+	
+	for i, ex := range expected {
+		if i < len(filtered) && filtered[i] != ex {
+			t.Errorf("expected tag %s, got %s", ex, filtered[i])
+		}
+	}
+	
+	// Test short tag
+	tags2 := []string{"ab"}
+	counts2 := []int{100}
+	filtered2 := filterTags(tags2, counts2)
+	if len(filtered2) != 0 {
+		t.Errorf("expected short tag to be filtered out")
+	}
+}
+
+func TestCalculateDrift(t *testing.T) {
+	hist := []TagStat{
+		{Tag: "rock", Weight: 0.8},
+		{Tag: "jazz", Weight: 0.5}, // Declined
+	}
+	curr := []TagStat{
+		{Tag: "rock", Weight: 0.9},
+		{Tag: "techno", Weight: 0.6}, // Emerged
+	}
+	
+	declined, emerged := calculateDrift(hist, curr)
+	
+	if len(declined) != 1 || declined[0].Tag != "jazz" {
+		t.Errorf("expected 'jazz' to decline")
+	}
+	
+	if len(emerged) != 1 || emerged[0].Tag != "techno" {
+		t.Errorf("expected 'techno' to emerge")
 	}
 }
 
