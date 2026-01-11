@@ -1,16 +1,38 @@
 Command-line tools that fetch a user's listening history from last.fm and
 perform analysis on it (e.g. what was I listening to last October?).
 
-# Usage
+# Commands
 
-First, run `update` to fetch data from last.fm. This data is stored in a local
-SQLite database. Then, you can run the analysis commands `top-artists` and
-`top-albums` to get the top artists and albums for a given time period. Usage
-for these commands looks like:
+## update
+
+Fetches data from last.fm and stores it in a local SQLite database. You must run this before running analysis commands.
+
+```bash
+$ last-fm-tools update --user=foo
+```
+
+## top-artists
+
+Calculates the top artists for a given time period.
 
 ```bash
 $ last-fm-tools top-artists 2020-01 --user=foo
+```
+
+## top-albums
+
+Calculates the top albums for a given time period.
+
+```bash
 $ last-fm-tools top-albums 2020-01-01 2020-02-01 --user=foo --number=20
+```
+
+## taste-report
+
+Generates a comprehensive music taste report in YAML format. This report includes metadata, current taste (artists, albums, tags), historical baseline, taste drift, and listening patterns.
+
+```bash
+$ last-fm-tools taste-report --user=foo
 ```
 
 ## Configuration
