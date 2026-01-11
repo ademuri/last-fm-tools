@@ -60,6 +60,6 @@ type DriftTag struct {
 type ListeningPatterns struct {
 	AlbumsPerArtistMedian   float64 `yaml:"albums_per_artist_median"`
 	AlbumsPerArtistAverage  float64 `yaml:"albums_per_artist_average"`
-	ArtistDiscoveryRate     int     `yaml:"artist_discovery_rate"`
+	NewArtistsInLast12Month int     `yaml:"new_artists_in_last_12_month"`
 	RepeatListeningRatio    float64 `yaml:"repeat_listening_ratio"`
 }

@@ -722,7 +722,7 @@ func calculateListeningPatterns(db *sql.DB, user string, start, end time.Time) (
 			HAVING first_listen >= ?
 		)
 	`
-	db.QueryRow(queryDisc, user, discoveryStart.Unix()).Scan(&lp.ArtistDiscoveryRate)
+	db.QueryRow(queryDisc, user, discoveryStart.Unix()).Scan(&lp.NewArtistsInLast12Month)
 
 	// Repeat Ratio
 	// (TotalScrobbles - UniqueArtists) / TotalScrobbles
