@@ -547,9 +547,9 @@ func calculateListeningPatterns(db *sql.DB, user string, start, end time.Time) (
 		}
 	}
 
-	// Discovery Rate (Last 12 months)
+	// New artists in past 12 months
 	// Count artists whose First Listen is > (Now - 12m)
-	discoveryStart := time.Now().AddDate(-1, 0, 0)
+	newArtistsStart := time.Now().AddDate(-1, 0, 0)
 	queryDisc := `
 		SELECT COUNT(*) FROM (
 			SELECT t.artist, MIN(l.date) as first_listen
@@ -559,7 +559,7 @@ func calculateListeningPatterns(db *sql.DB, user string, start, end time.Time) (
 			HAVING first_listen >= ?
 		)
 	`
-	db.QueryRow(queryDisc, user, discoveryStart.Unix()).Scan(&lp.ArtistDiscoveryRate)
+	db.QueryRow(queryDisc, user, newArtistsStart.Unix()).Scan(&lp.NewArtistsInLast12Months)
 
 	// Repeat Ratio
 	// (TotalScrobbles - UniqueArtists) / TotalScrobbles
