@@ -1,6 +1,11 @@
 /bazel-*
 secrets.go
 *.db
+*.db.bak
 
 # Config file. Contains auth secrets.
 last-fm-tools.yaml
+
+# For LLM coding assistants
+PROMPT.md
+PLAN.md
