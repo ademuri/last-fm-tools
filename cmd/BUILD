@@ -46,6 +46,7 @@ go_test(
         "newAlbums_test.go",
         "newArtists_test.go",
         "sendReports_test.go",
+        "topN_test.go",
         "topAlbums_test.go",
         "topArtists_test.go",
         "update_test.go",

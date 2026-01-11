@@ -16,8 +16,11 @@ limitations under the License.
 package cmd
 
 import (
+	"database/sql"
 	"fmt"
+	"io"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -27,6 +30,7 @@ var (
 	limitArtists int
 	limitAlbums  int
 	limitTracks  int
+	limitTags    int
 )
 
 var topNCmd = &cobra.Command{
@@ -35,7 +39,7 @@ var topNCmd = &cobra.Command{
 	Long:  `Generates a comprehensive report including top artists and albums over a specified period.`,
 	Args:  cobra.RangeArgs(1, 2),
 	Run: func(cmd *cobra.Command, args []string) {
-		err := printTopN(viper.GetString("database"), args)
+		err := printTopN(os.Stdout, viper.GetString("database"), args)
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)
@@ -48,9 +52,10 @@ func init() {
 	topNCmd.Flags().IntVar(&limitArtists, "artists", 10, "Number of top artists to show")
 	topNCmd.Flags().IntVar(&limitAlbums, "albums", 10, "Number of top albums to show")
 	topNCmd.Flags().IntVar(&limitTracks, "tracks", 10, "Number of top tracks to show")
+	topNCmd.Flags().IntVar(&limitTags, "tags", 5, "Number of top tags to show for artists and albums")
 }
 
-func printTopN(dbPath string, args []string) error {
+func printTopN(out io.Writer, dbPath string, args []string) error {
 	start, end, err := parseDateRangeFromArgs(args)
 	if err != nil {
 		return err
@@ -77,9 +82,9 @@ func printTopN(dbPath string, args []string) error {
 		return fmt.Errorf("counting total scrobbles: %w", err)
 	}
 
-	fmt.Printf("Music Taste Report for User: %s\n", user)
-	fmt.Printf("Period: %s to %s\n", start.Format("2006-01-02"), end.Format("2006-01-02"))
-	fmt.Printf("Total Scrobbles: %d\n\n", totalScrobbles)
+	fmt.Fprintf(out, "Music Taste Report for User: %s\n", user)
+	fmt.Fprintf(out, "Period: %s to %s\n", start.Format("2006-01-02"), end.Format("2006-01-02"))
+	fmt.Fprintf(out, "Total Scrobbles: %d\n\n", totalScrobbles)
 
 	// 2. Top Artists
 	if limitArtists > 0 {
@@ -100,7 +105,7 @@ func printTopN(dbPath string, args []string) error {
 		}
 		defer artistRows.Close()
 
-		fmt.Printf("## Top %d Artists\n", limitArtists)
+		fmt.Fprintf(out, "## Top %d Artists\n", limitArtists)
 		i := 1
 		for artistRows.Next() {
 			var name string
@@ -108,10 +113,20 @@ func printTopN(dbPath string, args []string) error {
 			if err := artistRows.Scan(&name, &count); err != nil {
 				return fmt.Errorf("scanning artist: %w", err)
 			}
-			fmt.Printf("%d. %s (%d)\n", i, name, count)
+
+			tags, err := getArtistTags(db, name, limitTags)
+			if err != nil {
+				return fmt.Errorf("getting artist tags: %w", err)
+			}
+
+			if tags != "" {
+				fmt.Fprintf(out, "%d. %s (%d) - [%s]\n", i, name, count, tags)
+			} else {
+				fmt.Fprintf(out, "%d. %s (%d)\n", i, name, count)
+			}
 			i++
 		}
-		fmt.Println()
+		fmt.Fprintln(out)
 	}
 
 	// 3. Top Albums
@@ -133,7 +148,7 @@ func printTopN(dbPath string, args []string) error {
 		}
 		defer albumRows.Close()
 
-		fmt.Printf("## Top %d Albums\n", limitAlbums)
+		fmt.Fprintf(out, "## Top %d Albums\n", limitAlbums)
 		i := 1
 		for albumRows.Next() {
 			var artist, album string
@@ -141,10 +156,20 @@ func printTopN(dbPath string, args []string) error {
 			if err := albumRows.Scan(&artist, &album, &count); err != nil {
 				return fmt.Errorf("scanning album: %w", err)
 			}
-			fmt.Printf("%d. %s - %s (%d)\n", i, album, artist, count)
+
+			tags, err := getAlbumTags(db, artist, album, limitTags)
+			if err != nil {
+				return fmt.Errorf("getting album tags: %w", err)
+			}
+
+			if tags != "" {
+				fmt.Fprintf(out, "%d. %s - %s (%d) - [%s]\n", i, album, artist, count, tags)
+			} else {
+				fmt.Fprintf(out, "%d. %s - %s (%d)\n", i, album, artist, count)
+			}
 			i++
 		}
-		fmt.Println()
+		fmt.Fprintln(out)
 	}
 
 	// 4. Top Tracks
@@ -166,7 +191,7 @@ func printTopN(dbPath string, args []string) error {
 		}
 		defer trackRows.Close()
 
-		fmt.Printf("## Top %d Tracks\n", limitTracks)
+		fmt.Fprintf(out, "## Top %d Tracks\n", limitTracks)
 		i := 1
 		for trackRows.Next() {
 			var name, artist string
@@ -174,11 +199,53 @@ func printTopN(dbPath string, args []string) error {
 			if err := trackRows.Scan(&name, &artist, &count); err != nil {
 				return fmt.Errorf("scanning track: %w", err)
 			}
-			fmt.Printf("%d. %s - %s (%d)\n", i, name, artist, count)
+			fmt.Fprintf(out, "%d. %s - %s (%d)\n", i, name, artist, count)
 			i++
 		}
-		fmt.Println()
+		fmt.Fprintln(out)
 	}
 
 	return nil
+}
+
+func getArtistTags(db *sql.DB, artist string, limit int) (string, error) {
+	if limit <= 0 {
+		return "", nil
+	}
+	rows, err := db.Query("SELECT tag FROM ArtistTag WHERE artist = ? ORDER BY count DESC LIMIT ?", artist, limit)
+	if err != nil {
+		return "", err
+	}
+	defer rows.Close()
+
+	var tags []string
+	for rows.Next() {
+		var tag string
+		if err := rows.Scan(&tag); err != nil {
+			return "", err
+		}
+		tags = append(tags, tag)
+	}
+	return strings.Join(tags, ", "), nil
+}
+
+func getAlbumTags(db *sql.DB, artist, album string, limit int) (string, error) {
+	if limit <= 0 {
+		return "", nil
+	}
+	rows, err := db.Query("SELECT tag FROM AlbumTag WHERE artist = ? AND album = ? ORDER BY count DESC LIMIT ?", artist, album, limit)
+	if err != nil {
+		return "", err
+	}
+	defer rows.Close()
+
+	var tags []string
+	for rows.Next() {
+		var tag string
+		if err := rows.Scan(&tag); err != nil {
+			return "", err
+		}
+		tags = append(tags, tag)
+	}
+	return strings.Join(tags, ", "), nil
 }
