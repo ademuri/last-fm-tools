@@ -36,27 +36,77 @@ type SendEmailConfig struct {
 	DryRun       bool
 	SMTPUsername string
 	SMTPPassword string
+	Start        time.Time
+	End          time.Time
 }
 
 var emailCmd = &cobra.Command{
-	Use:   "email <address> <analysis_name...>",
+	Use:   "email <address> <analysis_name...> [date] [date]",
 	Short: "Sends an email report",
 	Long: `Emails history to the specified user.
-  <analysis_name> is one or more of: top-artists, top-albums, new-artists, new-albums`,
+  <analysis_name> is one or more of: top-artists, top-albums, new-artists, new-albums.
+  Optional date arguments can be provided at the end (e.g. '2023-01' or '2023-01 2023-06').
+  If no dates are provided, defaults to the previous month.`,
 	Args: cobra.MinimumNArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
+		to := args[0]
+		rest := args[1:]
+
+		// Try to parse dates from the end of the args
+		var dateArgs []string
+		// Check last arg
+		if len(rest) > 0 {
+			_, err := parseSingleDatestring(rest[len(rest)-1])
+			if err == nil {
+				dateArgs = []string{rest[len(rest)-1]}
+				rest = rest[:len(rest)-1]
+
+				// Check second to last
+				if len(rest) > 0 {
+					_, err := parseSingleDatestring(rest[len(rest)-1])
+					if err == nil {
+						dateArgs = append([]string{rest[len(rest)-1]}, dateArgs...)
+						rest = rest[:len(rest)-1]
+					}
+				}
+			}
+		}
+
+		analysisTypes := rest
+		if len(analysisTypes) == 0 {
+			fmt.Println("Error: No analysis types specified")
+			os.Exit(1)
+		}
+
+		var start, end time.Time
+		var err error
+		if len(dateArgs) > 0 {
+			start, end, err = parseDateRangeFromArgs(dateArgs)
+			if err != nil {
+				fmt.Printf("Error parsing dates: %v\n", err)
+				os.Exit(1)
+			}
+		} else {
+			// Default to last month
+			now := time.Now()
+			start = time.Date(now.Year(), now.Month()-1, 1, 0, 0, 0, 0, now.Location())
+			end = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+		}
+
 		config := SendEmailConfig{
 			DbPath:       viper.GetString("database"),
 			User:         viper.GetString("user"),
 			From:         viper.GetString("from"),
-			To:           args[0],
+			To:           to,
 			ReportName:   viper.GetString("name"),
-			Types:        args[1:],
+			Types:        analysisTypes,
 			DryRun:       viper.GetBool("dryRun"),
 			SMTPUsername: viper.GetString("smtp_username"),
 			SMTPPassword: viper.GetString("smtp_password"),
+			Start:        start,
+			End:          end,
 		}
-		err := sendEmail(config)
+		err = sendEmail(config)
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)
@@ -73,8 +123,6 @@ func init() {
 }
 
 func sendEmail(config SendEmailConfig) error {
-	now := time.Now()
-
 	actions := make([]Analyser, 0)
 	for _, actionName := range config.Types {
 		action, err := getActionFromName(actionName)
@@ -82,16 +130,6 @@ func sendEmail(config SendEmailConfig) error {
 			return fmt.Errorf("Invalid analysis_name: %s", actionName)
 		}
 		actions = append(actions, action)
-	}
-
-	db, err := createDatabase(config.DbPath)
-	years, err := getNumYearsOfListeningData(db, config.User)
-	if err != nil {
-		return fmt.Errorf("getNumYearsOfListeningData(): %w")
-	}
-	err = db.Close()
-	if err != nil {
-		return fmt.Errorf("closing database: %w")
 	}
 
 	out := `
@@ -113,21 +151,16 @@ table, th, td {
 		out += `
 		<div>
 `
-		for year := 1; year < years; year++ {
-			start := time.Date(now.Year()-year, now.Month(), 1, 0, 0, 0, 0, now.Location())
-			end := start.AddDate(0, 1, 0)
-			out += fmt.Sprintf("<h2>%s for %s %s:</h2>\n", action.GetName(), config.User, start.Format("2006-01"))
-			analysis, err := action.GetResults(config.DbPath, config.User, start, end)
-			if err != nil {
-				return fmt.Errorf("sendEmail: %w", err)
-			}
+		out += fmt.Sprintf("<h2>%s for %s %s to %s:</h2>\n", action.GetName(), config.User, config.Start.Format("2006-01-02"), config.End.Format("2006-01-02"))
+		analysis, err := action.GetResults(config.DbPath, config.User, config.Start, config.End)
+		if err != nil {
+			return fmt.Errorf("sendEmail: %w", err)
+		}
 
-			if len(analysis.results) <= 1 {
-				// No listens found
-				out += "<div>No listens found.</div>\n"
-				continue
-			}
-
+		if len(analysis.results) <= 1 {
+			// No listens found
+			out += "<div>No listens found.</div>\n"
+		} else {
 			out += `
 			<table>
 				<thead>
@@ -151,16 +184,17 @@ table, th, td {
 				</tbody>
 			</table>
 `
-			out += fmt.Sprintf(`<div>%s</div>
-		</div>`, analysis.summary)
 		}
+		out += fmt.Sprintf(`<div>%s</div>
+		</div>`, analysis.summary)
 	}
 
 	subjectSuffix := ""
 	if len(config.ReportName) > 0 {
 		subjectSuffix = ": " + config.ReportName
 	}
-	subject := fmt.Sprintf("Listening report for %s %s%s", config.User, now.Format("2006-01"), subjectSuffix)
+	// Subject line format: Listening report for <User> <Start> to <End> <Suffix>
+	subject := fmt.Sprintf("Listening report for %s %s to %s%s", config.User, config.Start.Format("2006-01-02"), config.End.Format("2006-01-02"), subjectSuffix)
 
 	if config.DryRun {
 		fmt.Printf("Would have sent email: \nsubject: %s\n%s\n", subject, out)
@@ -189,6 +223,7 @@ table, th, td {
 		if err != nil {
 			return fmt.Errorf("Recording last run: %w", err)
 		}
+		now := time.Now()
 		_, err = db.Exec("UPDATE Report SET sent = ? WHERE user = ? AND name = ? AND email = ?", now, config.User, config.ReportName, config.To)
 		if err != nil {
 			return fmt.Errorf("Recording last run: %w", err)

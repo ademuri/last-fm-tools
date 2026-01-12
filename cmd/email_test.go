@@ -20,75 +20,8 @@ import (
 	"database/sql"
 	"fmt"
 	"strconv"
-	"testing"
 	"time"
 )
-
-func TestGetNumYearsOfListeningData(t *testing.T) {
-	db, err := createTestDb()
-	if err != nil {
-		t.Fatalf("createTestDb() error: %w", err)
-	}
-
-	user := "testuser"
-	err = createUser(db, user)
-	if err != nil {
-		t.Fatalf("createUser(%q) error: %w", user, err)
-	}
-
-	now := time.Now()
-	err = createListenForDate(db, user, now)
-	if err != nil {
-		t.Fatalf("createListenForDate: %w", err)
-	}
-
-	years, err := getNumYearsOfListeningData(db, user)
-	if err != nil {
-		t.Fatalf("getNumYearsOfListeningData(): %w", err)
-	}
-	if years != 1 {
-		t.Errorf("Expected 1 year, got %d", years)
-	}
-
-	oneYearAgo := time.Date(now.Year()-1, now.Month(), now.Day()+1, 0, 0, 0, 0, now.Location())
-	err = createListenForDate(db, user, oneYearAgo)
-	if err != nil {
-		t.Fatalf("createListenForDate: %w", err)
-	}
-	years, err = getNumYearsOfListeningData(db, user)
-	if err != nil {
-		t.Fatalf("getNumYearsOfListeningData(): %w", err)
-	}
-	if years != 1 {
-		t.Errorf("Expected 1 year, got %d", years)
-	}
-
-	oneYearMinusOneDayAgo := time.Date(now.Year()-1, now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
-	err = createListenForDate(db, user, oneYearMinusOneDayAgo)
-	if err != nil {
-		t.Fatalf("createListenForDate: %w", err)
-	}
-	years, err = getNumYearsOfListeningData(db, user)
-	if err != nil {
-		t.Fatalf("getNumYearsOfListeningData(): %w", err)
-	}
-	if years != 2 {
-		t.Errorf("Expected 2 year, got %d", years)
-	}
-
-	threeYearsOneMonthAgo := time.Date(now.Year()-3, now.Month()-1, now.Day(), 0, 0, 0, 0, now.Location())
-	err = createListenForDate(db, user, threeYearsOneMonthAgo)
-	if err != nil {
-		t.Fatalf("createListenForDate: %w", err)
-	}
-	years, err = getNumYearsOfListeningData(db, user)
-	if err != nil {
-		t.Fatalf("getNumYearsOfListeningData(): %w", err)
-	}
-	if years != 4 {
-		t.Errorf("Expected 4 year, got %d", years)
-	}
-}
 
 func createListenForDate(db *sql.DB, user string, time time.Time) error {
 	tx, err := db.Begin()

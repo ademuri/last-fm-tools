@@ -114,6 +114,10 @@ func sendReports(config SendReportsConfig) error {
 		toSendThisMonth := time.Date(now.Year(), now.Month(), runDay, 0, 0, 0, 0, now.Location())
 		toSendLastMonth := time.Date(now.Year(), now.Month()-1, runDay, 0, 0, 0, 0, now.Location())
 
+		// Report covers the previous month
+		emailConfig.Start = time.Date(now.Year(), now.Month()-1, 1, 0, 0, 0, 0, now.Location())
+		emailConfig.End = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+
 		if !config.Force {
 			if sent.After(toSendThisMonth) {
 				fmt.Printf("Report (%q, %q) was already sent this month on %s, not sending.\n", emailConfig.User, emailConfig.ReportName, sent.Format("2006-01-02"))
