@@ -127,7 +127,7 @@ func printForgotten(dbPath string) error {
 	user := viper.GetString("user")
 
 	// 1. Forgotten Artists
-	artists, err := analysis.GetForgottenArtists(db, user, config)
+	artists, err := analysis.GetForgottenArtists(db, user, config, time.Now())
 	if err != nil {
 		return err
 	}
@@ -139,7 +139,7 @@ func printForgotten(dbPath string) error {
 	fmt.Println()
 
 	// 2. Forgotten Albums
-	albums, err := analysis.GetForgottenAlbums(db, user, config)
+	albums, err := analysis.GetForgottenAlbums(db, user, config, time.Now())
 	if err != nil {
 		return err
 	}

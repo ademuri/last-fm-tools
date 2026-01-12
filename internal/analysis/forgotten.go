@@ -77,7 +77,32 @@ func GetThreshold(band string, isArtist bool) int {
 	return 0
 }
 
-func GetForgottenArtists(db *sql.DB, user string, cfg ForgottenConfig) (map[string][]ForgottenArtist, error) {
+func determineBand(scrobbles int64, isArtist bool) string {
+	if isArtist {
+		if scrobbles >= ThresholdArtistObsession {
+			return BandObsession
+		}
+		if scrobbles >= ThresholdArtistStrong {
+			return BandStrong
+		}
+		if scrobbles >= ThresholdArtistModerate {
+			return BandModerate
+		}
+	} else {
+		if scrobbles >= ThresholdAlbumObsession {
+			return BandObsession
+		}
+		if scrobbles >= ThresholdAlbumStrong {
+			return BandStrong
+		}
+		if scrobbles >= ThresholdAlbumModerate {
+			return BandModerate
+		}
+	}
+	return ""
+}
+
+func GetForgottenArtists(db *sql.DB, user string, cfg ForgottenConfig, now time.Time) (map[string][]ForgottenArtist, error) {
 	query := `
 		SELECT
 			t.artist,
@@ -98,7 +123,6 @@ func GetForgottenArtists(db *sql.DB, user string, cfg ForgottenConfig) (map[stri
 	defer rows.Close()
 
 	results := make(map[string][]ForgottenArtist)
-	now := time.Now()
 
 	for rows.Next() {
 		var a ForgottenArtist
@@ -110,14 +134,9 @@ func GetForgottenArtists(db *sql.DB, user string, cfg ForgottenConfig) (map[stri
 		a.LastListen = time.Unix(last, 0)
 		a.DaysSinceLast = int(now.Sub(a.LastListen).Hours() / 24)
 
-		if a.TotalScrobbles >= ThresholdArtistObsession {
-			a.Band = BandObsession
-		} else if a.TotalScrobbles >= ThresholdArtistStrong {
-			a.Band = BandStrong
-		} else if a.TotalScrobbles >= ThresholdArtistModerate {
-			a.Band = BandModerate
-		} else {
-			continue // Should be filtered by SQL, but good safety
+		a.Band = determineBand(a.TotalScrobbles, true)
+		if a.Band == "" {
+			continue
 		}
 
 		results[a.Band] = append(results[a.Band], a)
@@ -133,7 +152,7 @@ func GetForgottenArtists(db *sql.DB, user string, cfg ForgottenConfig) (map[stri
 	return results, nil
 }
 
-func GetForgottenAlbums(db *sql.DB, user string, cfg ForgottenConfig) (map[string][]ForgottenAlbum, error) {
+func GetForgottenAlbums(db *sql.DB, user string, cfg ForgottenConfig, now time.Time) (map[string][]ForgottenAlbum, error) {
 	query := `
 		SELECT
 			t.artist,
@@ -155,7 +174,6 @@ func GetForgottenAlbums(db *sql.DB, user string, cfg ForgottenConfig) (map[strin
 	defer rows.Close()
 
 	results := make(map[string][]ForgottenAlbum)
-	now := time.Now()
 
 	for rows.Next() {
 		var a ForgottenAlbum
@@ -167,13 +185,8 @@ func GetForgottenAlbums(db *sql.DB, user string, cfg ForgottenConfig) (map[strin
 		a.LastListen = time.Unix(last, 0)
 		a.DaysSinceLast = int(now.Sub(a.LastListen).Hours() / 24)
 
-		if a.TotalScrobbles >= ThresholdAlbumObsession {
-			a.Band = BandObsession
-		} else if a.TotalScrobbles >= ThresholdAlbumStrong {
-			a.Band = BandStrong
-		} else if a.TotalScrobbles >= ThresholdAlbumModerate {
-			a.Band = BandModerate
-		} else {
+		a.Band = determineBand(a.TotalScrobbles, false)
+		if a.Band == "" {
 			continue
 		}
 
