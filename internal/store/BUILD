@@ -7,6 +7,7 @@ go_library(
         "forgotten.go",
         "read.go",
         "store.go",
+        "top.go",
         "write.go",
     ],
     importpath = "github.com/ademuri/last-fm-tools/internal/store",

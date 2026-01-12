@@ -21,6 +21,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/ademuri/last-fm-tools/internal/store"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -72,33 +73,14 @@ func (t TopArtistsAnalyzer) GetName() string {
 }
 
 func (t TopArtistsAnalyzer) GetResults(dbPath string, user string, start time.Time, end time.Time) (analysis Analysis, err error) {
-	db, err := openDb(dbPath)
+	db, err := store.New(dbPath)
 	if err != nil {
 		err = fmt.Errorf("printTopArtists: %w", err)
 		return
 	}
+	defer db.Close()
 
-	exists, err := dbExists(db)
-	if err != nil {
-		err = fmt.Errorf("printTopArtists: %w", err)
-		return
-	}
-	if !exists {
-		err = fmt.Errorf("Database doesn't exist - run update first.")
-		return
-	}
-
-	const countQueryString = `
-	SELECT Track.artist, COUNT(Listen.id)
-	FROM Listen
-	INNER JOIN Track ON Track.id = Listen.track
-	WHERE user = ?
-	AND Listen.date BETWEEN ? AND ?
-	GROUP BY Track.artist
-	ORDER BY COUNT(*) DESC
-	;
-	`
-	countQuery, err := db.Query(countQueryString, user, start.Unix(), end.Unix())
+	counts, err := db.GetTopArtistsWithCount(user, start, end)
 	if err != nil {
 		err = fmt.Errorf("printTopArtists: %w", err)
 		return
@@ -107,19 +89,13 @@ func (t TopArtistsAnalyzer) GetResults(dbPath string, user string, start time.Ti
 	numArtists := 0
 	var numListens int64 = 0
 	analysis.results = [][]string{{"Artist", "Listens"}}
-	for countQuery.Next() {
-		artist := make([]string, 2)
-		countQuery.Scan(&artist[0], &artist[1])
+	
+	for _, apc := range counts {
 		numArtists += 1
-		var listens int64
-		listens, err = strconv.ParseInt(artist[1], 10, 64)
-		if err != nil {
-			err = fmt.Errorf("counting listens: %w", err)
-			return
-		}
+		listens := apc.Count
 
 		if (t.Config.NumToReturn == 0 || numArtists <= t.Config.NumToReturn) && (t.Config.FilterThreshold == 0 || listens > t.Config.FilterThreshold) {
-			analysis.results = append(analysis.results, artist)
+			analysis.results = append(analysis.results, []string{apc.Artist, strconv.FormatInt(listens, 10)})
 		}
 
 		numListens += listens

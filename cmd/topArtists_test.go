@@ -17,17 +17,9 @@ limitations under the License.
 package cmd
 
 import (
-	"os"
-	"strings"
 	"testing"
 )
 
-func TestPrintTopArtistsDatabaseDoesntExist(t *testing.T) {
-	err := printTopArtists(os.Getenv("TEST_TMPDIR")+"/invalid.db", 10, []string{"2020-05"})
-	if err == nil {
-		t.Fatalf("printTopArtists should have errored with no database")
-	}
-	if !strings.Contains(err.Error(), "doesn't exist") {
-		t.Fatalf("printTopArtists should have said the db doesn't exist: %w", err)
-	}
+// Tests were removed as store.New automatically creates the DB.
+func TestPlaceholderTopArtists(t *testing.T) {
 }

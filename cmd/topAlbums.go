@@ -21,6 +21,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/ademuri/last-fm-tools/internal/store"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -73,33 +74,15 @@ func (t TopAlbumsAnalyzer) GetName() string {
 
 func (t TopAlbumsAnalyzer) GetResults(dbPath string, user string, start time.Time, end time.Time) (analysis Analysis, err error) {
 	analysis.results = make([][]string, 0)
-	db, err := openDb(dbPath)
+	
+	db, err := store.New(dbPath)
 	if err != nil {
 		err = fmt.Errorf("getTopAlbums: %w", err)
 		return
 	}
+	defer db.Close()
 
-	exists, err := dbExists(db)
-	if err != nil {
-		err = fmt.Errorf("getTopAlbums: %w", err)
-		return
-	}
-	if !exists {
-		err = fmt.Errorf("Database doesn't exist - run update first.")
-		return
-	}
-
-	const countQueryString = `
-	SELECT Track.artist, Track.album, COUNT(Listen.id)
-	FROM Listen
-	INNER JOIN Track ON Track.id = Listen.track
-	WHERE user = ?
-	AND Listen.date BETWEEN ? AND ?
-	GROUP BY Track.artist, Track.album
-	ORDER BY COUNT(*) DESC
-	;
-	`
-	countQuery, err := db.Query(countQueryString, user, start.Unix(), end.Unix())
+	counts, err := db.GetTopAlbumsWithCount(user, start, end)
 	if err != nil {
 		err = fmt.Errorf("getTopAlbums: %w", err)
 		return
@@ -108,18 +91,13 @@ func (t TopAlbumsAnalyzer) GetResults(dbPath string, user string, start time.Tim
 	numAlbums := 0
 	var numListens int64 = 0
 	analysis.results = append(analysis.results, []string{"Artist", "Album", "Listens"})
-	for countQuery.Next() {
-		album := make([]string, 3)
-		countQuery.Scan(&album[0], &album[1], &album[2])
+	
+	for _, apc := range counts {
 		numAlbums += 1
-		var listens int64
-		listens, err = strconv.ParseInt(album[2], 10, 64)
-		if err != nil {
-			err = fmt.Errorf("counting listens: %w", err)
-			return
-		}
+		listens := apc.Count
+
 		if (t.Config.NumToReturn == 0 || numAlbums <= t.Config.NumToReturn) && (t.Config.FilterThreshold == 0 || listens > t.Config.FilterThreshold) {
-			analysis.results = append(analysis.results, album)
+			analysis.results = append(analysis.results, []string{apc.Artist, apc.Album, strconv.FormatInt(listens, 10)})
 		}
 		numListens += listens
 	}
