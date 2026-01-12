@@ -44,7 +44,8 @@ func TestGetForgottenArtists(t *testing.T) {
 	}
 
 	config := ForgottenConfig{
-		DormancyDays:       90,
+		LastListenAfter:    time.Unix(0, 0),
+		LastListenBefore:   now.AddDate(0, 0, -90),
 		MinArtistScrobbles: ThresholdArtistModerate,
 		MinAlbumScrobbles:  ThresholdAlbumModerate,
 		ResultsPerBand:     10,
@@ -119,7 +120,8 @@ func TestGetForgottenAlbums(t *testing.T) {
 	}
 
 	config := ForgottenConfig{
-		DormancyDays:       90,
+		LastListenAfter:    time.Unix(0, 0),
+		LastListenBefore:   now.AddDate(0, 0, -90),
 		MinArtistScrobbles: ThresholdArtistModerate,
 		MinAlbumScrobbles:  ThresholdAlbumModerate,
 		ResultsPerBand:     10,
@@ -141,5 +143,46 @@ func TestGetForgottenAlbums(t *testing.T) {
 		t.Errorf("expected 1 moderate album, got %d", len(results[BandModerate]))
 	} else if results[BandModerate][0].Album != "Album A2" {
 		t.Errorf("expected Album A2 in moderate, got %s", results[BandModerate][0].Album)
+	}
+}
+
+func TestGetForgottenArtistsWithDateRange(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	user := "testuser"
+	now := time.Now()
+
+	// Artist A: Last listen 5 years ago (Too old if we set after=3 years ago)
+	db.Exec("INSERT INTO Artist (name) VALUES (?)", "Artist A")
+	db.Exec("INSERT INTO Track (id, name, artist, album) VALUES (1, 'T1', 'Artist A', 'A1')")
+	for i := 0; i < ThresholdArtistObsession; i++ {
+		db.Exec("INSERT INTO Listen (user, track, date) VALUES (?, 1, ?)", user, now.AddDate(-5, 0, 0).Unix()-int64(i))
+	}
+
+	// Artist B: Last listen 2 years ago (Should be found)
+	db.Exec("INSERT INTO Artist (name) VALUES (?)", "Artist B")
+	db.Exec("INSERT INTO Track (id, name, artist, album) VALUES (2, 'T2', 'Artist B', 'B1')")
+	for i := 0; i < ThresholdArtistObsession; i++ {
+		db.Exec("INSERT INTO Listen (user, track, date) VALUES (?, 2, ?)", user, now.AddDate(-2, 0, 0).Unix()-int64(i))
+	}
+
+	config := ForgottenConfig{
+		LastListenAfter:    now.AddDate(-3, 0, 0), // Only listen since 3 years ago
+		LastListenBefore:   now.AddDate(-1, 0, 0), // But not in last 1 year
+		MinArtistScrobbles: 10,
+		ResultsPerBand:     10,
+		SortBy:             "dormancy",
+	}
+
+	results, err := GetForgottenArtists(db, user, config)
+	if err != nil {
+		t.Fatalf("GetForgottenArtists failed: %v", err)
+	}
+
+	if len(results[BandObsession]) != 1 {
+		t.Errorf("expected 1 obsession artist, got %d", len(results[BandObsession]))
+	} else if results[BandObsession][0].Artist != "Artist B" {
+		t.Errorf("expected Artist B, got %s", results[BandObsession][0].Artist)
 	}
 }

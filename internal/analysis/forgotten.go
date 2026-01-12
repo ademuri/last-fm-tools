@@ -8,7 +8,8 @@ import (
 )
 
 type ForgottenConfig struct {
-	DormancyDays       int
+	LastListenAfter    time.Time
+	LastListenBefore   time.Time
 	MinArtistScrobbles int
 	MinAlbumScrobbles  int
 	ResultsPerBand     int
@@ -75,8 +76,6 @@ func GetThreshold(band string, isArtist bool) int {
 }
 
 func GetForgottenArtists(db *sql.DB, user string, cfg ForgottenConfig) (map[string][]ForgottenArtist, error) {
-	dormancyLimit := time.Now().AddDate(0, 0, -cfg.DormancyDays)
-
 	query := `
 		SELECT
 			t.artist,
@@ -87,10 +86,10 @@ func GetForgottenArtists(db *sql.DB, user string, cfg ForgottenConfig) (map[stri
 		JOIN Track t ON l.track = t.id
 		WHERE l.user = ?
 		GROUP BY t.artist
-		HAVING total_scrobbles >= ? AND last_listen < ?
+		HAVING total_scrobbles >= ? AND last_listen >= ? AND last_listen <= ?
 	`
 
-	rows, err := db.Query(query, user, cfg.MinArtistScrobbles, dormancyLimit.Unix())
+	rows, err := db.Query(query, user, cfg.MinArtistScrobbles, cfg.LastListenAfter.Unix(), cfg.LastListenBefore.Unix())
 	if err != nil {
 		return nil, fmt.Errorf("querying forgotten artists: %w", err)
 	}
@@ -133,8 +132,6 @@ func GetForgottenArtists(db *sql.DB, user string, cfg ForgottenConfig) (map[stri
 }
 
 func GetForgottenAlbums(db *sql.DB, user string, cfg ForgottenConfig) (map[string][]ForgottenAlbum, error) {
-	dormancyLimit := time.Now().AddDate(0, 0, -cfg.DormancyDays)
-
 	query := `
 		SELECT
 			t.artist,
@@ -146,10 +143,10 @@ func GetForgottenAlbums(db *sql.DB, user string, cfg ForgottenConfig) (map[strin
 		JOIN Track t ON l.track = t.id
 		WHERE l.user = ? AND t.album != ''
 		GROUP BY t.artist, t.album
-		HAVING total_scrobbles >= ? AND last_listen < ?
+		HAVING total_scrobbles >= ? AND last_listen >= ? AND last_listen <= ?
 	`
 
-	rows, err := db.Query(query, user, cfg.MinAlbumScrobbles, dormancyLimit.Unix())
+	rows, err := db.Query(query, user, cfg.MinAlbumScrobbles, cfg.LastListenAfter.Unix(), cfg.LastListenBefore.Unix())
 	if err != nil {
 		return nil, fmt.Errorf("querying forgotten albums: %w", err)
 	}

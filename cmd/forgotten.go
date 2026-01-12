@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/ademuri/last-fm-tools/internal/analysis"
 	"github.com/olekukonko/tablewriter"
@@ -17,6 +18,8 @@ var (
 	minAlbumScrobbles  int
 	resultsPerBand     int
 	sortBy             string
+	afterDate          string
+	beforeDate         string
 )
 
 var forgottenCmd = &cobra.Command{
@@ -40,6 +43,8 @@ func init() {
 	forgottenCmd.Flags().IntVar(&minAlbumScrobbles, "min-album", 5, "Minimum scrobbles for album inclusion")
 	forgottenCmd.Flags().IntVar(&resultsPerBand, "results", 10, "Max results shown per interest band")
 	forgottenCmd.Flags().StringVar(&sortBy, "sort", "dormancy", "Sort order: 'dormancy' or 'listens'")
+	forgottenCmd.Flags().StringVar(&afterDate, "after", "", "Only include entities with last listen after this date (YYYY-MM-DD)")
+	forgottenCmd.Flags().StringVar(&beforeDate, "before", "", "Only include entities with last listen before this date (YYYY-MM-DD)")
 }
 
 func printForgotten(dbPath string) error {
@@ -57,8 +62,34 @@ func printForgotten(dbPath string) error {
 		return fmt.Errorf("database doesn't exist - run update first")
 	}
 
+	// Determine time range
+	var lastListenBefore time.Time
+	if beforeDate != "" {
+		pd, err := parseSingleDatestring(beforeDate)
+		if err != nil {
+			return fmt.Errorf("invalid before date: %w", err)
+		}
+		lastListenBefore = pd.Date
+	} else {
+		// Default to dormancy
+		lastListenBefore = time.Now().AddDate(0, 0, -dormancyDays)
+	}
+
+	var lastListenAfter time.Time
+	if afterDate != "" {
+		pd, err := parseSingleDatestring(afterDate)
+		if err != nil {
+			return fmt.Errorf("invalid after date: %w", err)
+		}
+		lastListenAfter = pd.Date
+	} else {
+		// Default to 0 (beginning of time)
+		lastListenAfter = time.Unix(0, 0)
+	}
+
 	config := analysis.ForgottenConfig{
-		DormancyDays:       dormancyDays,
+		LastListenAfter:    lastListenAfter,
+		LastListenBefore:   lastListenBefore,
 		MinArtistScrobbles: minArtistScrobbles,
 		MinAlbumScrobbles:  minAlbumScrobbles,
 		ResultsPerBand:     resultsPerBand,
