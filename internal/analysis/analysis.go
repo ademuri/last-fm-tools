@@ -782,3 +782,27 @@ func calculateListeningPatterns(db *sql.DB, user string, start, end time.Time) (
 	lp.Top100ArtistsAlbumsMedian, lp.Top100ArtistsAlbumsAverage = calcStats(top100Counts)
 
 	// New artists in past 12 months
+	// Count artists whose First Listen is > (Now - 12m)
+	newArtistsStart := time.Now().AddDate(-1, 0, 0)
+	queryDisc := `
+		SELECT COUNT(*) FROM (
+			SELECT t.artist, MIN(l.date) as first_listen
+			FROM Listen l JOIN Track t ON l.track = t.id
+			WHERE l.user = ?
+			GROUP BY t.artist
+			HAVING first_listen >= ?
+		)
+	`
+	db.QueryRow(queryDisc, user, newArtistsStart.Unix()).Scan(&lp.NewArtistsInLast12Month)
+
+	// Repeat Ratio
+	// (TotalScrobbles - UniqueArtists) / TotalScrobbles
+	totalS, _ := getTotalScrobbles(db, user)
+	totalA, _ := getTotalArtists(db, user)
+	if totalS > 0 {
+		ratio := float64(totalS - int64(totalA)) / float64(totalS)
+		lp.RepeatListeningRatio = math.Round(ratio*100) / 100
+	}
+
+	return lp, nil
+}
