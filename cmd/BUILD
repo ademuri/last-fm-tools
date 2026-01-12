@@ -9,6 +9,7 @@ go_library(
         "date.go",
         "deleteReport.go",
         "email.go",
+        "forgotten.go",
         "listReports.go",
         "newAlbums.go",
         "newArtists.go",

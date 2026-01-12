@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "analysis.go",
+        "forgotten.go",
         "types.go",
     ],
     importpath = "github.com/ademuri/last-fm-tools/internal/analysis",
@@ -14,6 +15,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "analysis_test.go",
+        "forgotten_test.go",
         "top_albums_format_test.go",
     ],
     embed = [":go_default_library"],
