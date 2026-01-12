@@ -20,18 +20,15 @@ import (
 )
 
 func TestListReports(t *testing.T) {
-	db, err := createTestDb()
-	if err != nil {
-		t.Fatalf("createTestDb() error: %w", err)
-	}
+	db, dbPath := createTestDb(t)
 
 	user := "testuser"
-	err = addReport(getTestDbPath(), "report1", user, "user@example.com", 1, []string{"top-albums"})
+	err := addReport(dbPath, "report1", user, "user@example.com", 1, []string{"top-albums"})
 	if err != nil {
 		t.Fatalf("addReport() error: %w", err)
 	}
 
-	err = listReports(getTestDbPath(), user)
+	err = listReports(dbPath, user)
 	if err != nil {
 		t.Fatalf("listReports() error: %w", err)
 	}
@@ -42,7 +39,7 @@ func TestListReports(t *testing.T) {
 		t.Fatalf("failed to clear reports: %v", err)
 	}
 
-	err = listReports(getTestDbPath(), user)
+	err = listReports(dbPath, user)
 	if err != nil {
 		t.Fatalf("listReports() should not fail even with no reports: %v", err)
 	}

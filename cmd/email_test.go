@@ -56,15 +56,11 @@ func createListenForDate(db *sql.DB, user string, t time.Time) error {
 }
 
 func TestGenerateEmailContent(t *testing.T) {
-	dbPath := getTestDbPath()
-	db, err := createTestDb()
-	if err != nil {
-		t.Fatalf("createTestDb() error: %w", err)
-	}
+	db, dbPath := createTestDb(t)
 	defer db.Close()
 
 	user := "testuser"
-	err = createUser(db, user)
+	err := createUser(db, user)
 	if err != nil {
 		t.Fatalf("createUser: %w", err)
 	}
@@ -134,15 +130,11 @@ func TestGenerateEmailContent(t *testing.T) {
 }
 
 func TestGenerateEmailContentNoData(t *testing.T) {
-	dbPath := getTestDbPath()
-	db, err := createTestDb()
-	if err != nil {
-		t.Fatalf("createTestDb() error: %w", err)
-	}
+	db, dbPath := createTestDb(t)
 	defer db.Close()
 
 	user := "testuser"
-	err = createUser(db, user)
+	err := createUser(db, user)
 	if err != nil {
 		t.Fatalf("createUser: %w", err)
 	}

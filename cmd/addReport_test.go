@@ -22,12 +22,9 @@ import (
 )
 
 func TestAddReport(t *testing.T) {
-	_, err := createTestDb()
-	if err != nil {
-		t.Fatalf("createTestDb() error: %w", err)
-	}
+	_, dbPath := createTestDb(t)
 
-	err = addReport(getTestDbPath(), "test report", "testuser", "testuser@gmail.com", 1, []string{"top-albums", "top-artists"})
+	err := addReport(dbPath, "test report", "testuser", "testuser@gmail.com", 1, []string{"top-albums", "top-artists"})
 	if err != nil {
 		t.Fatalf("addReport() error: %w", err)
 	}
@@ -36,12 +33,9 @@ func TestAddReport(t *testing.T) {
 func TestAddReportInvalidAction(t *testing.T) {
 	invalidAction := "not-real"
 
-	_, err := createTestDb()
-	if err != nil {
-		t.Fatalf("createTestDb() error: %w", err)
-	}
+	_, dbPath := createTestDb(t)
 
-	err = addReport(getTestDbPath(), "test report", "testuser", "testuser@gmail.com", 1, []string{invalidAction})
+	err := addReport(dbPath, "test report", "testuser", "testuser@gmail.com", 1, []string{invalidAction})
 	if err == nil {
 		t.Fatalf("addReport should have failed with invalid action")
 	}

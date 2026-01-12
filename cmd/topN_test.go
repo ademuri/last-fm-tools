@@ -27,10 +27,7 @@ import (
 
 func TestPrintTopNWithTags(t *testing.T) {
 	// Setup temporary database using helper from update_test.go (same package)
-	db, err := createTestDb()
-	if err != nil {
-		t.Fatalf("createTestDb() error: %w", err)
-	}
+	db, dbPath := createTestDb(t)
 	defer db.Close()
 
 	user := "testuser"
@@ -93,7 +90,7 @@ track := "Come Together"
 	end := time.Now().Format("2006-01-02")
 	args := []string{start, end}
 
-	err = printTopN(&out, getTestDbPath(), args)
+	err = printTopN(&out, dbPath, args)
 	if err != nil {
 		t.Fatalf("printTopN failed: %v", err)
 	}

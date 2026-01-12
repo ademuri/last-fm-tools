@@ -20,15 +20,12 @@ import (
 )
 
 func TestDeleteReport(t *testing.T) {
-	db, err := createTestDb()
-	if err != nil {
-		t.Fatalf("createTestDb() error: %w", err)
-	}
+	db, dbPath := createTestDb(t)
 
 	user := "testuser"
 	reportName := "reportToDelete"
 	email := "user@example.com"
-	err = addReport(getTestDbPath(), reportName, user, email, 1, []string{"top-albums"})
+	err := addReport(dbPath, reportName, user, email, 1, []string{"top-albums"})
 	if err != nil {
 		t.Fatalf("addReport() error: %w", err)
 	}
@@ -44,7 +41,7 @@ func TestDeleteReport(t *testing.T) {
 	}
 
 	// Delete it
-	err = deleteReport(getTestDbPath(), user, reportName, email)
+	err = deleteReport(dbPath, user, reportName, email)
 	if err != nil {
 		t.Fatalf("deleteReport() error: %w", err)
 	}
@@ -60,27 +57,24 @@ func TestDeleteReport(t *testing.T) {
 }
 
 func TestDeleteReportWithDuplicateName(t *testing.T) {
-	db, err := createTestDb()
-	if err != nil {
-		t.Fatalf("createTestDb() error: %w", err)
-	}
+	db, dbPath := createTestDb(t)
 
 	user := "testuser"
 	reportName := "duplicateReport"
 	email1 := "user1@example.com"
 	email2 := "user2@example.com"
 
-	err = addReport(getTestDbPath(), reportName, user, email1, 1, []string{"top-albums"})
+	err := addReport(dbPath, reportName, user, email1, 1, []string{"top-albums"})
 	if err != nil {
 		t.Fatalf("addReport() 1 error: %w", err)
 	}
-	err = addReport(getTestDbPath(), reportName, user, email2, 1, []string{"top-artists"})
+	err = addReport(dbPath, reportName, user, email2, 1, []string{"top-artists"})
 	if err != nil {
 		t.Fatalf("addReport() 2 error: %w", err)
 	}
 
 	// Delete first one
-	err = deleteReport(getTestDbPath(), user, reportName, email1)
+	err = deleteReport(dbPath, user, reportName, email1)
 	if err != nil {
 		t.Fatalf("deleteReport() error: %w", err)
 	}
@@ -105,13 +99,10 @@ func TestDeleteReportWithDuplicateName(t *testing.T) {
 }
 
 func TestDeleteNonExistentReport(t *testing.T) {
-	_, err := createTestDb()
-	if err != nil {
-		t.Fatalf("createTestDb() error: %w", err)
-	}
+	_, dbPath := createTestDb(t)
 
 	user := "testuser"
-	err = deleteReport(getTestDbPath(), user, "nonExistent", "any@email.com")
+	err := deleteReport(dbPath, user, "nonExistent", "any@email.com")
 	if err == nil {
 		t.Fatalf("deleteReport() should fail for non-existent report")
 	}
