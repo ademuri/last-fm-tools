@@ -18,8 +18,8 @@ var (
 	minAlbumScrobbles  int
 	resultsPerBand     int
 	sortBy             string
-	afterDate          string
-	beforeDate         string
+	lastListenAfterStr  string
+	lastListenBeforeStr string
 )
 
 var forgottenCmd = &cobra.Command{
@@ -43,8 +43,8 @@ func init() {
 	forgottenCmd.Flags().IntVar(&minAlbumScrobbles, "min-album", 5, "Minimum scrobbles for album inclusion")
 	forgottenCmd.Flags().IntVar(&resultsPerBand, "results", 10, "Max results shown per interest band")
 	forgottenCmd.Flags().StringVar(&sortBy, "sort", "dormancy", "Sort order: 'dormancy' or 'listens'")
-	forgottenCmd.Flags().StringVar(&afterDate, "after", "", "Only include entities with last listen after this date (YYYY-MM-DD)")
-	forgottenCmd.Flags().StringVar(&beforeDate, "before", "", "Only include entities with last listen before this date (YYYY-MM-DD)")
+	forgottenCmd.Flags().StringVar(&lastListenAfterStr, "last_listen_after", "", "Only include entities with last listen after this date (YYYY-MM-DD)")
+	forgottenCmd.Flags().StringVar(&lastListenBeforeStr, "last_listen_before", "", "Only include entities with last listen before this date (YYYY-MM-DD)")
 }
 
 func printForgotten(dbPath string) error {
@@ -64,10 +64,10 @@ func printForgotten(dbPath string) error {
 
 	// Determine time range
 	var lastListenBefore time.Time
-	if beforeDate != "" {
-		pd, err := parseSingleDatestring(beforeDate)
+	if lastListenBeforeStr != "" {
+		pd, err := parseSingleDatestring(lastListenBeforeStr)
 		if err != nil {
-			return fmt.Errorf("invalid before date: %w", err)
+			return fmt.Errorf("invalid last_listen_before date: %w", err)
 		}
 		lastListenBefore = pd.Date
 	} else {
@@ -76,10 +76,10 @@ func printForgotten(dbPath string) error {
 	}
 
 	var lastListenAfter time.Time
-	if afterDate != "" {
-		pd, err := parseSingleDatestring(afterDate)
+	if lastListenAfterStr != "" {
+		pd, err := parseSingleDatestring(lastListenAfterStr)
 		if err != nil {
-			return fmt.Errorf("invalid after date: %w", err)
+			return fmt.Errorf("invalid last_listen_after date: %w", err)
 		}
 		lastListenAfter = pd.Date
 	} else {

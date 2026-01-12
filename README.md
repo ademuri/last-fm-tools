@@ -49,8 +49,8 @@ Options:
 - `--min-album`: Minimum scrobbles for album inclusion (default: 5)
 - `--results`: Max results shown per interest band (default: 10)
 - `--sort`: Sort order: 'dormancy' or 'listens' (default: 'dormancy')
-- `--after`: Only include entities with last listen after this date (YYYY, YYYY-MM, or YYYY-MM-DD)
-- `--before`: Only include entities with last listen before this date (YYYY, YYYY-MM, or YYYY-MM-DD)
+- `--last_listen_after`: Only include entities with last listen after this date (YYYY, YYYY-MM, or YYYY-MM-DD)
+- `--last_listen_before`: Only include entities with last listen before this date (YYYY, YYYY-MM, or YYYY-MM-DD)
 
 ## Configuration
 
