@@ -133,14 +133,13 @@ func printArtistBand(results map[string][]analysis.ForgottenArtist, band string)
 	fmt.Printf("\n### %s Interest (%d+ scrobbles)\n", band, analysis.GetThreshold(band, true))
 	
 	table := tablewriter.NewWriter(os.Stdout)
-	table.Header([]string{"Artist", "Scrobbles", "Last Listen", "Days Ago"})
+	table.Header([]string{"Artist", "Scrobbles", "Last Listen"})
 	
 	for _, a := range items {
 		table.Append([]string{
 			a.Artist,
 			strconv.FormatInt(a.TotalScrobbles, 10),
 			a.LastListen.Format("2006-01-02"),
-			strconv.Itoa(a.DaysSinceLast),
 		})
 	}
 	table.Render()
@@ -155,7 +154,7 @@ func printAlbumBand(results map[string][]analysis.ForgottenAlbum, band string) {
 	fmt.Printf("\n### %s Interest (%d+ scrobbles)\n", band, analysis.GetThreshold(band, false))
 
 	table := tablewriter.NewWriter(os.Stdout)
-	table.Header([]string{"Artist", "Album", "Scrobbles", "Last Listen", "Days Ago"})
+	table.Header([]string{"Artist", "Album", "Scrobbles", "Last Listen"})
 
 	for _, a := range items {
 		table.Append([]string{
@@ -163,7 +162,6 @@ func printAlbumBand(results map[string][]analysis.ForgottenAlbum, band string) {
 			a.Album,
 			strconv.FormatInt(a.TotalScrobbles, 10),
 			a.LastListen.Format("2006-01-02"),
-			strconv.Itoa(a.DaysSinceLast),
 		})
 	}
 	table.Render()
