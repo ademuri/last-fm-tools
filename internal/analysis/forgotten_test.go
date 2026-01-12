@@ -38,14 +38,11 @@ func TestGetForgottenArtists(t *testing.T) {
 	// Artist D: 5 listens, last listen 2 years ago (Ignored - too few)
 	db.Exec("INSERT INTO Artist (name) VALUES (?)", "Artist D")
 	db.Exec("INSERT INTO Track (id, name, artist, album) VALUES (4, 'Track 4', 'Artist D', 'Album D1')")
-	// ThresholdArtistModerate is 10, so 5 is ignored
-	for i := 0; i < 5; i++ {
-		db.Exec("INSERT INTO Listen (user, track, date) VALUES (?, 4, ?)", user, twoYearsAgo.Unix()-int64(i))
-	}
-
 	config := ForgottenConfig{
 		LastListenAfter:    time.Unix(0, 0),
 		LastListenBefore:   now.AddDate(0, 0, -90),
+		FirstListenAfter:   time.Unix(0, 0),
+		FirstListenBefore:  now.AddDate(1, 0, 0),
 		MinArtistScrobbles: ThresholdArtistModerate,
 		MinAlbumScrobbles:  ThresholdAlbumModerate,
 		ResultsPerBand:     10,
@@ -122,6 +119,8 @@ func TestGetForgottenAlbums(t *testing.T) {
 	config := ForgottenConfig{
 		LastListenAfter:    time.Unix(0, 0),
 		LastListenBefore:   now.AddDate(0, 0, -90),
+		FirstListenAfter:   time.Unix(0, 0),
+		FirstListenBefore:  now.AddDate(1, 0, 0),
 		MinArtistScrobbles: ThresholdArtistModerate,
 		MinAlbumScrobbles:  ThresholdAlbumModerate,
 		ResultsPerBand:     10,
@@ -170,6 +169,8 @@ func TestGetForgottenArtistsWithDateRange(t *testing.T) {
 	config := ForgottenConfig{
 		LastListenAfter:    now.AddDate(-3, 0, 0), // Only listen since 3 years ago
 		LastListenBefore:   now.AddDate(-1, 0, 0), // But not in last 1 year
+		FirstListenAfter:   time.Unix(0, 0),
+		FirstListenBefore:  now.AddDate(1, 0, 0),
 		MinArtistScrobbles: 10,
 		ResultsPerBand:     10,
 		SortBy:             "dormancy",
@@ -180,6 +181,58 @@ func TestGetForgottenArtistsWithDateRange(t *testing.T) {
 		t.Fatalf("GetForgottenArtists failed: %v", err)
 	}
 
+	if len(results[BandObsession]) != 1 {
+		t.Errorf("expected 1 obsession artist, got %d", len(results[BandObsession]))
+	} else if results[BandObsession][0].Artist != "Artist B" {
+		t.Errorf("expected Artist B, got %s", results[BandObsession][0].Artist)
+	}
+}
+
+func TestGetForgottenArtistsWithFirstListenDateRange(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	user := "testuser"
+	now := time.Now()
+
+	// Artist A: First listen 10 years ago (Too old)
+	db.Exec("INSERT INTO Artist (name) VALUES (?)", "Artist A")
+	db.Exec("INSERT INTO Track (id, name, artist, album) VALUES (1, 'T1', 'Artist A', 'A1')")
+	// Insert one very old listen (First Listen)
+	db.Exec("INSERT INTO Listen (user, track, date) VALUES (?, 1, ?)", user, now.AddDate(-10, 0, 0).Unix())
+	// Insert recent listens (Last Listen 2 years ago)
+	for i := 0; i < ThresholdArtistObsession; i++ {
+		db.Exec("INSERT INTO Listen (user, track, date) VALUES (?, 1, ?)", user, now.AddDate(-2, 0, 0).Unix()-int64(i))
+	}
+
+	// Artist B: First listen 3 years ago (In range)
+	db.Exec("INSERT INTO Artist (name) VALUES (?)", "Artist B")
+	db.Exec("INSERT INTO Track (id, name, artist, album) VALUES (2, 'T2', 'Artist B', 'B1')")
+	// First listen 3 years ago
+	db.Exec("INSERT INTO Listen (user, track, date) VALUES (?, 2, ?)", user, now.AddDate(-3, 0, 0).Unix())
+	// Last listen 2 years ago
+	for i := 0; i < ThresholdArtistObsession; i++ {
+		db.Exec("INSERT INTO Listen (user, track, date) VALUES (?, 2, ?)", user, now.AddDate(-2, 0, 0).Unix()-int64(i))
+	}
+
+	config := ForgottenConfig{
+		LastListenAfter:    time.Unix(0, 0),
+		LastListenBefore:   now.AddDate(0, 0, -90),
+		FirstListenAfter:   now.AddDate(-5, 0, 0),
+		FirstListenBefore:  now.AddDate(-2, 0, 0),
+		MinArtistScrobbles: 10,
+		ResultsPerBand:     10,
+		SortBy:             "dormancy",
+	}
+
+	results, err := GetForgottenArtists(db, user, config)
+	if err != nil {
+		t.Fatalf("GetForgottenArtists failed: %v", err)
+	}
+
+	// Artist A should be excluded (First listen too old)
+	// Artist B should be included
+	
 	if len(results[BandObsession]) != 1 {
 		t.Errorf("expected 1 obsession artist, got %d", len(results[BandObsession]))
 	} else if results[BandObsession][0].Artist != "Artist B" {

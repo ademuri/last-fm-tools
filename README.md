@@ -51,6 +51,8 @@ Options:
 - `--sort`: Sort order: 'dormancy' or 'listens' (default: 'dormancy')
 - `--last_listen_after`: Only include entities with last listen after this date (YYYY, YYYY-MM, or YYYY-MM-DD)
 - `--last_listen_before`: Only include entities with last listen before this date (YYYY, YYYY-MM, or YYYY-MM-DD)
+- `--first_listen_after`: Only include entities with first listen after this date (YYYY, YYYY-MM, or YYYY-MM-DD)
+- `--first_listen_before`: Only include entities with first listen before this date (YYYY, YYYY-MM, or YYYY-MM-DD)
 
 ## Configuration
 

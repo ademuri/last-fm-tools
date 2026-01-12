@@ -18,8 +18,10 @@ var (
 	minAlbumScrobbles  int
 	resultsPerBand     int
 	sortBy             string
-	lastListenAfterStr  string
-	lastListenBeforeStr string
+	lastListenAfterStr   string
+	lastListenBeforeStr  string
+	firstListenAfterStr  string
+	firstListenBeforeStr string
 )
 
 var forgottenCmd = &cobra.Command{
@@ -45,6 +47,8 @@ func init() {
 	forgottenCmd.Flags().StringVar(&sortBy, "sort", "dormancy", "Sort order: 'dormancy' or 'listens'")
 	forgottenCmd.Flags().StringVar(&lastListenAfterStr, "last_listen_after", "", "Only include entities with last listen after this date (YYYY-MM-DD)")
 	forgottenCmd.Flags().StringVar(&lastListenBeforeStr, "last_listen_before", "", "Only include entities with last listen before this date (YYYY-MM-DD)")
+	forgottenCmd.Flags().StringVar(&firstListenAfterStr, "first_listen_after", "", "Only include entities with first listen after this date (YYYY-MM-DD)")
+	forgottenCmd.Flags().StringVar(&firstListenBeforeStr, "first_listen_before", "", "Only include entities with first listen before this date (YYYY-MM-DD)")
 }
 
 func printForgotten(dbPath string) error {
@@ -87,9 +91,33 @@ func printForgotten(dbPath string) error {
 		lastListenAfter = time.Unix(0, 0)
 	}
 
+	var firstListenBefore time.Time
+	if firstListenBeforeStr != "" {
+		pd, err := parseSingleDatestring(firstListenBeforeStr)
+		if err != nil {
+			return fmt.Errorf("invalid first_listen_before date: %w", err)
+		}
+		firstListenBefore = pd.Date
+	} else {
+		firstListenBefore = time.Now()
+	}
+
+	var firstListenAfter time.Time
+	if firstListenAfterStr != "" {
+		pd, err := parseSingleDatestring(firstListenAfterStr)
+		if err != nil {
+			return fmt.Errorf("invalid first_listen_after date: %w", err)
+		}
+		firstListenAfter = pd.Date
+	} else {
+		firstListenAfter = time.Unix(0, 0)
+	}
+
 	config := analysis.ForgottenConfig{
 		LastListenAfter:    lastListenAfter,
 		LastListenBefore:   lastListenBefore,
+		FirstListenAfter:   firstListenAfter,
+		FirstListenBefore:  firstListenBefore,
 		MinArtistScrobbles: minArtistScrobbles,
 		MinAlbumScrobbles:  minAlbumScrobbles,
 		ResultsPerBand:     resultsPerBand,
