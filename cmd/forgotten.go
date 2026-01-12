@@ -99,7 +99,7 @@ func printArtistBand(results map[string][]analysis.ForgottenArtist, band string)
 		return
 	}
 
-	fmt.Printf("\n### %s Interest (%d+ scrobbles)\n", band, getMinScrobblesForBand(band, true))
+	fmt.Printf("\n### %s Interest (%d+ scrobbles)\n", band, analysis.GetThreshold(band, true))
 	
 	table := tablewriter.NewWriter(os.Stdout)
 	table.Header([]string{"Artist", "Scrobbles", "Last Listen", "Days Ago"})
@@ -121,7 +121,7 @@ func printAlbumBand(results map[string][]analysis.ForgottenAlbum, band string) {
 		return
 	}
 
-	fmt.Printf("\n### %s Interest (%d+ scrobbles)\n", band, getMinScrobblesForBand(band, false))
+	fmt.Printf("\n### %s Interest (%d+ scrobbles)\n", band, analysis.GetThreshold(band, false))
 
 	table := tablewriter.NewWriter(os.Stdout)
 	table.Header([]string{"Artist", "Album", "Scrobbles", "Last Listen", "Days Ago"})
@@ -138,25 +138,4 @@ func printAlbumBand(results map[string][]analysis.ForgottenAlbum, band string) {
 	table.Render()
 }
 
-func getMinScrobblesForBand(band string, isArtist bool) int {
-	if isArtist {
-		switch band {
-		case analysis.BandObsession:
-			return 100
-		case analysis.BandStrong:
-			return 30
-		case analysis.BandModerate:
-			return 10
-		}
-	} else {
-		switch band {
-		case analysis.BandObsession:
-			return 50
-		case analysis.BandStrong:
-			return 15
-		case analysis.BandModerate:
-			return 5
-		}
-	}
-	return 0
-}
+

@@ -38,7 +38,41 @@ const (
 	BandObsession = "Obsession"
 	BandStrong    = "Strong"
 	BandModerate  = "Moderate"
+
+	// Artist Thresholds
+	ThresholdArtistObsession = 100
+	ThresholdArtistStrong    = 30
+	ThresholdArtistModerate  = 10
+
+	// Album Thresholds
+	ThresholdAlbumObsession = 50
+	ThresholdAlbumStrong    = 15
+	ThresholdAlbumModerate  = 5
 )
+
+// GetThreshold returns the minimum scrobbles for a given band and type (artist/album).
+func GetThreshold(band string, isArtist bool) int {
+	if isArtist {
+		switch band {
+		case BandObsession:
+			return ThresholdArtistObsession
+		case BandStrong:
+			return ThresholdArtistStrong
+		case BandModerate:
+			return ThresholdArtistModerate
+		}
+	} else {
+		switch band {
+		case BandObsession:
+			return ThresholdAlbumObsession
+		case BandStrong:
+			return ThresholdAlbumStrong
+		case BandModerate:
+			return ThresholdAlbumModerate
+		}
+	}
+	return 0
+}
 
 func GetForgottenArtists(db *sql.DB, user string, cfg ForgottenConfig) (map[string][]ForgottenArtist, error) {
 	dormancyLimit := time.Now().AddDate(0, 0, -cfg.DormancyDays)
@@ -75,11 +109,11 @@ func GetForgottenArtists(db *sql.DB, user string, cfg ForgottenConfig) (map[stri
 		a.LastListen = time.Unix(last, 0)
 		a.DaysSinceLast = int(now.Sub(a.LastListen).Hours() / 24)
 
-		if a.TotalScrobbles >= 100 {
+		if a.TotalScrobbles >= ThresholdArtistObsession {
 			a.Band = BandObsession
-		} else if a.TotalScrobbles >= 30 {
+		} else if a.TotalScrobbles >= ThresholdArtistStrong {
 			a.Band = BandStrong
-		} else if a.TotalScrobbles >= 10 {
+		} else if a.TotalScrobbles >= ThresholdArtistModerate {
 			a.Band = BandModerate
 		} else {
 			continue // Should be filtered by SQL, but good safety
@@ -134,11 +168,11 @@ func GetForgottenAlbums(db *sql.DB, user string, cfg ForgottenConfig) (map[strin
 		a.LastListen = time.Unix(last, 0)
 		a.DaysSinceLast = int(now.Sub(a.LastListen).Hours() / 24)
 
-		if a.TotalScrobbles >= 50 {
+		if a.TotalScrobbles >= ThresholdAlbumObsession {
 			a.Band = BandObsession
-		} else if a.TotalScrobbles >= 15 {
+		} else if a.TotalScrobbles >= ThresholdAlbumStrong {
 			a.Band = BandStrong
-		} else if a.TotalScrobbles >= 5 {
+		} else if a.TotalScrobbles >= ThresholdAlbumModerate {
 			a.Band = BandModerate
 		} else {
 			continue
