@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ademuri/last-fm-tools/internal/analysis"
+	"github.com/ademuri/last-fm-tools/internal/store"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -26,7 +27,7 @@ var (
 var forgottenCmd = &cobra.Command{
 	Use:   "forgotten",
 	Short: "Surfaces artists and albums heavily listened to in the past but not recently",
-	Long:  `Identifies music that has fallen out of rotation based on dormancy and historical listen counts.`, 
+	Long:  `Identifies music that has fallen out of rotation based on dormancy and historical listen counts.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		err := printForgotten(viper.GetString("database"))
 		if err != nil {
@@ -50,19 +51,11 @@ func init() {
 }
 
 func printForgotten(dbPath string) error {
-	db, err := openDb(dbPath)
+	db, err := store.New(dbPath)
 	if err != nil {
-		return fmt.Errorf("openDb: %w", err)
+		return fmt.Errorf("opening database: %w", err)
 	}
 	defer db.Close()
-
-	exists, err := dbExists(db)
-	if err != nil {
-		return fmt.Errorf("checking db existence: %w", err)
-	}
-	if !exists {
-		return fmt.Errorf("database doesn't exist - run update first")
-	}
 
 	// Determine time range
 	var lastListenBefore time.Time
@@ -192,5 +185,3 @@ func printAlbumBand(results map[string][]analysis.ForgottenAlbum, band string) {
 	}
 	table.Render()
 }
-
-

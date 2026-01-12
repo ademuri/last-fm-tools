@@ -7,6 +7,7 @@ go_library(
         "analyser.go",
         "authenticate.go",
         "date.go",
+        "db_legacy.go",
         "deleteReport.go",
         "email.go",
         "forgotten.go",
@@ -26,6 +27,7 @@ go_library(
     deps = [
         "//internal/analysis:go_default_library",
         "//internal/migration:go_default_library",
+        "//internal/store:go_default_library",
         "@com_github_ademuri_lastfm_go//lastfm:go_default_library",
         "@com_github_avast_retry_go//:go_default_library",
         "@com_github_mattn_go_sqlite3//:go_default_library",
@@ -46,6 +48,7 @@ go_test(
         "date_test.go",
         "deleteReport_test.go",
         "email_test.go",
+        "legacy_test_helpers_test.go",
         "listReports_test.go",
         "newAlbums_test.go",
         "newArtists_test.go",

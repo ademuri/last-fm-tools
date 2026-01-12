@@ -1,10 +1,11 @@
 package analysis
 
 import (
-	"database/sql"
 	"fmt"
 	"sort"
 	"time"
+
+	"github.com/ademuri/last-fm-tools/internal/store"
 )
 
 type ForgottenConfig struct {
@@ -102,37 +103,30 @@ func determineBand(scrobbles int64, isArtist bool) string {
 	return ""
 }
 
-func GetForgottenArtists(db *sql.DB, user string, cfg ForgottenConfig, now time.Time) (map[string][]ForgottenArtist, error) {
-	query := `
-		SELECT
-			t.artist,
-			COUNT(*) as total_scrobbles,
-			MIN(l.date) as first_listen,
-			MAX(l.date) as last_listen
-		FROM Listen l
-		JOIN Track t ON l.track = t.id
-		WHERE l.user = ?
-		GROUP BY t.artist
-		HAVING total_scrobbles >= ? AND last_listen >= ? AND last_listen <= ? AND first_listen >= ? AND first_listen <= ?
-	`
-
-	rows, err := db.Query(query, user, cfg.MinArtistScrobbles, cfg.LastListenAfter.Unix(), cfg.LastListenBefore.Unix(), cfg.FirstListenAfter.Unix(), cfg.FirstListenBefore.Unix())
-	if err != nil {
-		return nil, fmt.Errorf("querying forgotten artists: %w", err)
+func GetForgottenArtists(db *store.Store, user string, cfg ForgottenConfig, now time.Time) (map[string][]ForgottenArtist, error) {
+	opts := store.ForgottenQueryOptions{
+		MinScrobbles:      cfg.MinArtistScrobbles,
+		LastListenAfter:   cfg.LastListenAfter.Unix(),
+		LastListenBefore:  cfg.LastListenBefore.Unix(),
+		FirstListenAfter:  cfg.FirstListenAfter.Unix(),
+		FirstListenBefore: cfg.FirstListenBefore.Unix(),
 	}
-	defer rows.Close()
+
+	stats, err := db.GetForgottenArtists(user, opts)
+	if err != nil {
+		return nil, fmt.Errorf("getting forgotten artists: %w", err)
+	}
 
 	results := make(map[string][]ForgottenArtist)
 
-	for rows.Next() {
-		var a ForgottenArtist
-		var first, last int64
-		if err := rows.Scan(&a.Artist, &a.TotalScrobbles, &first, &last); err != nil {
-			return nil, err
+	for _, s := range stats {
+		a := ForgottenArtist{
+			Artist:         s.Artist,
+			TotalScrobbles: s.TotalScrobbles,
+			FirstListen:    s.FirstListen,
+			LastListen:     s.LastListen,
+			DaysSinceLast:  int(now.Sub(s.LastListen).Hours() / 24),
 		}
-		a.FirstListen = time.Unix(first, 0)
-		a.LastListen = time.Unix(last, 0)
-		a.DaysSinceLast = int(now.Sub(a.LastListen).Hours() / 24)
 
 		a.Band = determineBand(a.TotalScrobbles, true)
 		if a.Band == "" {
@@ -152,38 +146,31 @@ func GetForgottenArtists(db *sql.DB, user string, cfg ForgottenConfig, now time.
 	return results, nil
 }
 
-func GetForgottenAlbums(db *sql.DB, user string, cfg ForgottenConfig, now time.Time) (map[string][]ForgottenAlbum, error) {
-	query := `
-		SELECT
-			t.artist,
-			t.album,
-			COUNT(*) as total_scrobbles,
-			MIN(l.date) as first_listen,
-			MAX(l.date) as last_listen
-		FROM Listen l
-		JOIN Track t ON l.track = t.id
-		WHERE l.user = ? AND t.album != ''
-		GROUP BY t.artist, t.album
-		HAVING total_scrobbles >= ? AND last_listen >= ? AND last_listen <= ? AND first_listen >= ? AND first_listen <= ?
-	`
-
-	rows, err := db.Query(query, user, cfg.MinAlbumScrobbles, cfg.LastListenAfter.Unix(), cfg.LastListenBefore.Unix(), cfg.FirstListenAfter.Unix(), cfg.FirstListenBefore.Unix())
-	if err != nil {
-		return nil, fmt.Errorf("querying forgotten albums: %w", err)
+func GetForgottenAlbums(db *store.Store, user string, cfg ForgottenConfig, now time.Time) (map[string][]ForgottenAlbum, error) {
+	opts := store.ForgottenQueryOptions{
+		MinScrobbles:      cfg.MinAlbumScrobbles,
+		LastListenAfter:   cfg.LastListenAfter.Unix(),
+		LastListenBefore:  cfg.LastListenBefore.Unix(),
+		FirstListenAfter:  cfg.FirstListenAfter.Unix(),
+		FirstListenBefore: cfg.FirstListenBefore.Unix(),
 	}
-	defer rows.Close()
+
+	stats, err := db.GetForgottenAlbums(user, opts)
+	if err != nil {
+		return nil, fmt.Errorf("getting forgotten albums: %w", err)
+	}
 
 	results := make(map[string][]ForgottenAlbum)
 
-	for rows.Next() {
-		var a ForgottenAlbum
-		var first, last int64
-		if err := rows.Scan(&a.Artist, &a.Album, &a.TotalScrobbles, &first, &last); err != nil {
-			return nil, err
+	for _, s := range stats {
+		a := ForgottenAlbum{
+			Artist:         s.Artist,
+			Album:          s.Album,
+			TotalScrobbles: s.TotalScrobbles,
+			FirstListen:    s.FirstListen,
+			LastListen:     s.LastListen,
+			DaysSinceLast:  int(now.Sub(s.LastListen).Hours() / 24),
 		}
-		a.FirstListen = time.Unix(first, 0)
-		a.LastListen = time.Unix(last, 0)
-		a.DaysSinceLast = int(now.Sub(a.LastListen).Hours() / 24)
 
 		a.Band = determineBand(a.TotalScrobbles, false)
 		if a.Band == "" {
@@ -208,10 +195,7 @@ func sortArtists(artists []ForgottenArtist, sortBy string) {
 		if sortBy == "listens" {
 			return artists[i].TotalScrobbles > artists[j].TotalScrobbles
 		}
-		// Default to dormancy (longest dormancy first? or shortest?)
-		// "The goal is to help rediscover music" -> probably want the ones I haven't heard in longest time?
-		// Or maybe the ones that just slipped out (shortest dormancy > threshold)?
-		// Usually "Forgotten" implies "Long time ago". Let's sort by DaysSinceLast DESC.
+		// Default to dormancy (longest dormancy first)
 		return artists[i].DaysSinceLast > artists[j].DaysSinceLast
 	})
 }

@@ -9,6 +9,9 @@ go_library(
     ],
     importpath = "github.com/ademuri/last-fm-tools/internal/analysis",
     visibility = ["//visibility:public"],
+    deps = [
+        "//internal/store:go_default_library",
+    ],
 )
 
 go_test(
@@ -21,6 +24,7 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//internal/migration:go_default_library",
+        "//internal/store:go_default_library",
         "@com_github_mattn_go_sqlite3//:go_default_library",
     ],
 )

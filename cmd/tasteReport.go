@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/ademuri/last-fm-tools/internal/analysis"
+	"github.com/ademuri/last-fm-tools/internal/store"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
@@ -31,20 +32,16 @@ func runTasteReport() error {
 	dbPath := viper.GetString("database")
 	user := viper.GetString("user")
 
-	db, err := openDb(dbPath)
+	// Check if DB exists by trying to open it via Store
+	// Store.New will create tables if they don't exist, which is fine.
+	// But we might want to check if there is data?
+	// The report generation will fail or return empty if no data.
+	
+db, err := store.New(dbPath)
 	if err != nil {
 		return fmt.Errorf("opening database: %w", err)
 	}
 	defer db.Close()
-
-	// Check if DB has data
-	exists, err := dbExists(db)
-	if err != nil {
-		return fmt.Errorf("checking db: %w", err)
-	}
-	if !exists {
-		return fmt.Errorf("database empty or missing. Run 'update' first")
-	}
 
 	report, err := analysis.GenerateReport(db, user)
 	if err != nil {

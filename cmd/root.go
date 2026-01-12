@@ -16,7 +16,6 @@ limitations under the License.
 package cmd
 
 import (
-	"database/sql"
 	"fmt"
 	"os"
 
@@ -122,22 +121,4 @@ func initConfig() {
 			rootCmd.Flags().Set(f.Name, viper.GetString(f.Name))
 		}
 	})
-}
-
-func openDb(dbPath string) (*sql.DB, error) {
-	db, err := sql.Open("sqlite3", dbPath)
-	if err != nil {
-		return nil, fmt.Errorf("openDb: %w", err)
-	}
-	return db, nil
-}
-
-func dbExists(db *sql.DB) (bool, error) {
-	exists, err := db.Query("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'User'")
-	if err != nil {
-		return false, fmt.Errorf("createTables: %w", err)
-	}
-	defer exists.Close()
-
-	return exists.Next(), nil
 }

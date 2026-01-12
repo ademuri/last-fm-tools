@@ -1,68 +1,68 @@
 package analysis
 
 import (
-	"database/sql"
+	"fmt"
+	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/ademuri/last-fm-tools/internal/migration"
+	"github.com/ademuri/last-fm-tools/internal/store"
 	_ "github.com/mattn/go-sqlite3"
 )
 
 func TestTopAlbumsFormat(t *testing.T) {
 	// Setup DB
-	db, err := sql.Open("sqlite3", ":memory:")
+	dbPath := filepath.Join(t.TempDir(), "test_format.db")
+	db, err := store.New(dbPath)
 	if err != nil {
-		t.Fatalf("failed to open in-memory db: %v", err)
+		t.Fatalf("failed to create store: %v", err)
 	}
 	defer db.Close()
-
-	_, err = db.Exec(migration.Create)
-	if err != nil {
-		t.Fatalf("failed to create tables: %v", err)
-	}
 
 	user := "testuser"
 	artist := "Test Artist"
 	album := "Test Album"
 	
 	// Insert Data
-	db.Exec("INSERT INTO User (name) VALUES (?)", user)
-	db.Exec("INSERT INTO Artist (name) VALUES (?)", artist)
-	db.Exec("INSERT INTO Album (artist, name) VALUES (?, ?)", artist, album)
-	db.Exec("INSERT INTO Track (id, name, artist, album) VALUES (1, 'Track 1', ?, ?)", artist, album)
+	db.CreateUser(user)
 	
 	now := time.Now()
 	// 5 listens
+	var tracks []store.TrackImport
 	for i := 0; i < 5; i++ {
-		db.Exec("INSERT INTO Listen (user, track, date) VALUES (?, 1, ?)", user, now.Unix()-int64(i))
+		tracks = append(tracks, store.TrackImport{
+			Artist:    artist,
+			Album:     album,
+			TrackName: "Track 1",
+			DateUTS:   fmt.Sprintf("%d", now.Unix()-int64(i)),
+		})
 	}
+	db.AddRecentTracks(user, tracks)
 
-	// Test getTopAlbumsForArtist
-	albums, err := getTopAlbumsForArtist(db, user, artist, now.AddDate(0, -1, 0), now.AddDate(0, 1, 0), 10)
+	// Test GetTopAlbumsForArtist (Direct store call)
+	albumsData, err := db.GetTopAlbumsForArtist(user, artist, now.AddDate(0, -1, 0), now.AddDate(0, 1, 0), 10)
 	if err != nil {
-		t.Fatalf("getTopAlbumsForArtist failed: %v", err)
+		t.Fatalf("GetTopAlbumsForArtist failed: %v", err)
 	}
 
-	if len(albums) != 1 {
-		t.Fatalf("expected 1 album, got %d", len(albums))
+	if len(albumsData) != 1 {
+		t.Fatalf("expected 1 album, got %d", len(albumsData))
 	}
 
-	expected := "Test Album (5)"
-	if albums[0] != expected {
-		t.Errorf("expected '%s', got '%s'", expected, albums[0])
+	if albumsData[0].Tag != album { // Tag field used for Album Name in TagCount reuse
+		t.Errorf("expected '%s', got '%s'", album, albumsData[0].Tag)
+	}
+	if albumsData[0].Count != 5 {
+		t.Errorf("expected 5 listens, got %d", albumsData[0].Count)
 	}
 	
 	// Integration Test via GenerateReport
-	// We need to make sure this artist is picked up as a top artist.
-	// We already have listens, so it should be.
-	
-	// Need at least one tag or something? No, basic report should work.
-	
 	report, err := GenerateReport(db, user)
 	if err != nil {
 		t.Fatalf("GenerateReport failed: %v", err)
 	}
+	
+	expectedFormatted := "Test Album (5)"
 	
 	found := false
 	for _, a := range report.CurrentTaste.TopArtists {
@@ -71,8 +71,8 @@ func TestTopAlbumsFormat(t *testing.T) {
 			if len(a.TopAlbums) == 0 {
 				t.Errorf("artist %s has no top albums in report", artist)
 			} else {
-				if a.TopAlbums[0] != expected {
-					t.Errorf("in report: expected '%s', got '%s'", expected, a.TopAlbums[0])
+				if a.TopAlbums[0] != expectedFormatted {
+					t.Errorf("in report: expected '%s', got '%s'", expectedFormatted, a.TopAlbums[0])
 				}
 			}
 		}

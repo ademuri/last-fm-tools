@@ -1,65 +1,39 @@
 package analysis
 
 import (
-	"database/sql"
+	"fmt"
 	"testing"
 	"time"
+
+	"github.com/ademuri/last-fm-tools/internal/store"
 )
 
-// Helper to insert scrobbles
-func insertScrobbles(t *testing.T, db *sql.DB, user string, artist, album string, count int, start time.Time) {
-	// Ensure artist exists
-	db.Exec("INSERT OR IGNORE INTO Artist (name) VALUES (?)", artist)
-	
-	// Ensure album exists if provided
-	if album != "" {
-		db.Exec("INSERT OR IGNORE INTO Album (artist, name) VALUES (?, ?)", artist, album)
-	}
-
-	// Create track (simple ID generation based on artist/album string hash would be better, but monotonic is fine for tests if careful)
-	// For simplicity, we just use a unique track name per artist/album combo
-	// trackName := "Track " + artist + album
-	
-	// We need a track ID. In these tests, we can just let SQLite autoincrement if we changed schema, 
-	// but schema has explicit ID.
-	// Let's just use a hash or random ID? Or simpler: use a global counter in the test scope?
-	// Actually, the previous tests manually inserted IDs. 
-	// To keep it simple and safe without changing schema, let's just do manual inserts in the test function 
-	// but use a loop for the *listens*.
-	// This helper might be best just for the loop of listens.
-	
-	t.Helper()
-	// NO-OP for track creation here to avoid ID collisions. 
-	// The caller should create the track. This helper just adds listens.
-	
-	// Find track ID (assuming caller created it)
-	var trackID int
-	err := db.QueryRow("SELECT id FROM Track WHERE artist = ? AND (album = ? OR (? = '' AND album = ''))", artist, album, album).Scan(&trackID)
-	if err != nil {
-		t.Fatalf("Track not found for %s - %s: %v", artist, album, err)
-	}
-
-	for i := 0; i < count; i++ {
-		// Decreasing date from start
-		db.Exec("INSERT INTO Listen (user, track, date) VALUES (?, ?, ?)", user, trackID, start.AddDate(0, 0, -i).Unix()) // 1 day apart
-	}
-}
-
 // Better helper that handles everything
-func setupArtistAndListens(t *testing.T, db *sql.DB, user string, id int, artist, album string, count int, lastListen time.Time) {
+func setupArtistAndListens(t *testing.T, db *store.Store, user string, id int, artist, album string, count int, lastListen time.Time) {
 	t.Helper()
-	db.Exec("INSERT INTO Artist (name) VALUES (?)", artist)
-	if album != "" {
-		db.Exec("INSERT INTO Album (artist, name) VALUES (?, ?)", artist, album)
-	}
-	db.Exec("INSERT INTO Track (id, name, artist, album) VALUES (?, ?, ?, ?)", id, "Track "+artist, artist, album)
 	
-	// Insert listens such that the *last* listen is at lastListen.
-	// And we have 'count' listens.
-	// We'll space them 1 minute apart backwards.
+	// We use AddRecentTracks to insert data.
+	// It handles artist, album, track creation.
+	// We need to generate 'count' tracks with timestamps ending at lastListen.
+	
+	var tracks []store.TrackImport
 	for i := 0; i < count; i++ {
-		db.Exec("INSERT INTO Listen (user, track, date) VALUES (?, ?, ?)", user, id, lastListen.Add(time.Duration(-i)*time.Minute).Unix())
+		ts := lastListen.Add(time.Duration(-i) * time.Minute)
+		tracks = append(tracks, store.TrackImport{
+			Artist:    artist,
+			Album:     album,
+			TrackName: fmt.Sprintf("Track %s %s", artist, album), // Simple track name reuse
+			DateUTS:   fmt.Sprintf("%d", ts.Unix()),
+		})
 	}
+	
+	// AddRecentTracks batches.
+	if err := db.AddRecentTracks(user, tracks); err != nil {
+		t.Fatalf("AddRecentTracks failed: %v", err)
+	}
+	
+	// Note: We ignored 'id' param because AddRecentTracks auto-generates IDs. 
+	// This should be fine as long as tests don't rely on specific IDs.
 }
 
 func TestGetForgottenArtists(t *testing.T) {
@@ -67,6 +41,8 @@ func TestGetForgottenArtists(t *testing.T) {
 	defer db.Close()
 
 	user := "testuser"
+	db.CreateUser(user) // Ensure user exists
+
 	now := time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC)
 	twoYearsAgo := now.AddDate(-2, 0, 0)
 
@@ -113,6 +89,8 @@ func TestGetForgottenAlbums(t *testing.T) {
 	defer db.Close()
 
 	user := "testuser"
+	db.CreateUser(user)
+
 	now := time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC)
 	twoYearsAgo := now.AddDate(-2, 0, 0)
 
@@ -154,6 +132,8 @@ func TestGetForgottenArtistsWithDateRange(t *testing.T) {
 	defer db.Close()
 
 	user := "testuser"
+	db.CreateUser(user)
+
 	now := time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	// Artist A: Last listen 5 years ago
@@ -189,17 +169,24 @@ func TestGetForgottenArtistsWithFirstListenDateRange(t *testing.T) {
 	defer db.Close()
 
 	user := "testuser"
+	db.CreateUser(user)
+
 	now := time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	// Artist A: First listen 10 years ago, last listen 2 years ago
-	// We need to simulate first listen. setupArtistAndListens creates 'count' listens ending at lastListen.
-	// To make first listen 10 years ago, we add one extra listen there.
 	setupArtistAndListens(t, db, user, 1, "Artist A", "A1", ThresholdArtistObsession, now.AddDate(-2, 0, 0))
-	db.Exec("INSERT INTO Listen (user, track, date) VALUES (?, 1, ?)", user, now.AddDate(-10, 0, 0).Unix())
+	// Add one extra listen 10 years ago manually via AddRecentTracks
+	ts := now.AddDate(-10, 0, 0)
+	db.AddRecentTracks(user, []store.TrackImport{{
+		Artist: "Artist A", Album: "A1", TrackName: "Old Track", DateUTS: fmt.Sprintf("%d", ts.Unix()),
+	}})
 
 	// Artist B: First listen 3 years ago, last listen 2 years ago
 	setupArtistAndListens(t, db, user, 2, "Artist B", "B1", ThresholdArtistObsession, now.AddDate(-2, 0, 0))
-	db.Exec("INSERT INTO Listen (user, track, date) VALUES (?, 2, ?)", user, now.AddDate(-3, 0, 0).Unix())
+	ts = now.AddDate(-3, 0, 0)
+	db.AddRecentTracks(user, []store.TrackImport{{
+		Artist: "Artist B", Album: "B1", TrackName: "Old Track B", DateUTS: fmt.Sprintf("%d", ts.Unix()),
+	}})
 
 	config := ForgottenConfig{
 		LastListenAfter:    time.Unix(0, 0),
@@ -228,6 +215,8 @@ func TestSortingAndLimits(t *testing.T) {
 	defer db.Close()
 
 	user := "testuser"
+	db.CreateUser(user)
+
 	now := time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	// Artist A: 150 scrobbles, last listen 5 years ago
@@ -242,7 +231,6 @@ func TestSortingAndLimits(t *testing.T) {
 	// All are Obsession (>100)
 
 	// 1. Sort by Dormancy (default): Oldest LastListen first
-	// Order should be: A (5y), C (3y), B (2y)
 	config := ForgottenConfig{
 		LastListenAfter:    time.Unix(0, 0),
 		LastListenBefore:   now.AddDate(0, 0, -90),
@@ -267,7 +255,6 @@ func TestSortingAndLimits(t *testing.T) {
 	}
 
 	// 2. Sort by Listens: Most scrobbles first
-	// Order should be: B (200), A (150), C (120)
 	config.SortBy = "listens"
 	results, err = GetForgottenArtists(db, user, config, now)
 	if err != nil {
