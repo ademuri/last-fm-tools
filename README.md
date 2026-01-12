@@ -35,6 +35,21 @@ Generates a comprehensive music taste report in YAML format. This report include
 $ last-fm-tools taste-report --user=foo
 ```
 
+## forgotten
+
+Surfaces artists and albums that were heavily listened to in the past but haven't been played recently. This helps in rediscovering music that has fallen out of rotation.
+
+```bash
+$ last-fm-tools forgotten --user=foo
+```
+
+Options:
+- `--dormancy`: Minimum days since last play to qualify (default: 90)
+- `--min-artist`: Minimum scrobbles for artist inclusion (default: 10)
+- `--min-album`: Minimum scrobbles for album inclusion (default: 5)
+- `--results`: Max results shown per interest band (default: 10)
+- `--sort`: Sort order: 'dormancy' or 'listens' (default: 'dormancy')
+
 ## Configuration
 
 Configuration options
