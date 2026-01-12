@@ -58,8 +58,11 @@ type DriftTag struct {
 }
 
 type ListeningPatterns struct {
-	AlbumsPerArtistMedian   float64 `yaml:"albums_per_artist_median"`
-	AlbumsPerArtistAverage  float64 `yaml:"albums_per_artist_average"`
-	NewArtistsInLast12Month int     `yaml:"new_artists_in_last_12_month"`
-	RepeatListeningRatio    float64 `yaml:"repeat_listening_ratio"`
+	AllAlbumsPerArtistMedian   float64 `yaml:"all_albums_per_artist_median"`
+	AllAlbumsPerArtistAverage  float64 `yaml:"all_albums_per_artist_average"`
+	Top100ArtistsAlbumsMedian  float64 `yaml:"top_100_artists_albums_median"`
+	Top100ArtistsAlbumsAverage float64 `yaml:"top_100_artists_albums_average"`
+	ArtistsWith3PlusAlbums     int     `yaml:"artists_with_3_plus_albums"`
+	NewArtistsInLast12Month    int     `yaml:"new_artists_in_last_12_month"`
+	RepeatListeningRatio       float64 `yaml:"repeat_listening_ratio"`
 }

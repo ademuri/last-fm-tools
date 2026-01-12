@@ -712,13 +712,17 @@ func calculateDrift(histTags, currTags []TagStat) ([]DriftTag, []DriftTag) {
 func calculateListeningPatterns(db *sql.DB, user string, start, end time.Time) (ListeningPatterns, error) {
 	lp := ListeningPatterns{}
 
-	// Albums per artist
+	// We need album counts per artist, but also need to know who the top artists are (by listens)
+	// to filter for Top 100.
+	
+	// 1. Get album counts and listen counts per artist
 	query := `
-		SELECT COUNT(DISTINCT t.album)
+		SELECT t.artist, COUNT(DISTINCT t.album) as album_count, COUNT(*) as listen_count
 		FROM Listen l
 		JOIN Track t ON l.track = t.id
 		WHERE l.user = ? AND l.date BETWEEN ? AND ? AND t.album != ''
 		GROUP BY t.artist
+		ORDER BY listen_count DESC
 	`
 	rows, err := db.Query(query, user, start.Unix(), end.Unix())
 	if err != nil {
@@ -726,49 +730,55 @@ func calculateListeningPatterns(db *sql.DB, user string, start, end time.Time) (
 	}
 	defer rows.Close()
 
-	var albumCounts []float64
-	var sum float64
+	var allCounts []float64
+	var top100Counts []float64
+	var artistsWith3Plus int
+	
+	i := 0
 	for rows.Next() {
-		var c float64
-		rows.Scan(&c)
-		albumCounts = append(albumCounts, c)
-		sum += c
+		var artist string
+		var albums float64
+		var listens int64
+		if err := rows.Scan(&artist, &albums, &listens); err != nil {
+			return lp, err
+		}
+		
+		allCounts = append(allCounts, albums)
+		
+		if i < 100 {
+			top100Counts = append(top100Counts, albums)
+		}
+		
+		if albums >= 3 {
+			artistsWith3Plus++
+		}
+		i++
 	}
 	
-	if len(albumCounts) > 0 {
-		lp.AlbumsPerArtistAverage = math.Round((sum / float64(len(albumCounts)))*10) / 10
-		
-		sort.Float64s(albumCounts)
-		mid := len(albumCounts) / 2
-		if len(albumCounts)%2 == 1 {
-			lp.AlbumsPerArtistMedian = albumCounts[mid]
-		} else {
-			lp.AlbumsPerArtistMedian = (albumCounts[mid-1] + albumCounts[mid]) / 2
+	lp.ArtistsWith3PlusAlbums = artistsWith3Plus
+
+	// Helper to calc median/avg
+	calcStats := func(counts []float64) (median float64, avg float64) {
+		if len(counts) == 0 {
+			return 0, 0
 		}
+		sum := 0.0
+		for _, c := range counts {
+			sum += c
+		}
+		avg = math.Round((sum / float64(len(counts)))*10) / 10
+		
+		sort.Float64s(counts)
+		mid := len(counts) / 2
+		if len(counts)%2 == 1 {
+			median = counts[mid]
+		} else {
+			median = (counts[mid-1] + counts[mid]) / 2
+		}
+		return
 	}
 
-	// Discovery Rate (Last 12 months)
-	// Count artists whose First Listen is > (Now - 12m)
-	discoveryStart := time.Now().AddDate(-1, 0, 0)
-	queryDisc := `
-		SELECT COUNT(*) FROM (
-			SELECT t.artist, MIN(l.date) as first_listen
-			FROM Listen l JOIN Track t ON l.track = t.id
-			WHERE l.user = ?
-			GROUP BY t.artist
-			HAVING first_listen >= ?
-		)
-	`
-	db.QueryRow(queryDisc, user, discoveryStart.Unix()).Scan(&lp.NewArtistsInLast12Month)
+	lp.AllAlbumsPerArtistMedian, lp.AllAlbumsPerArtistAverage = calcStats(allCounts)
+	lp.Top100ArtistsAlbumsMedian, lp.Top100ArtistsAlbumsAverage = calcStats(top100Counts)
 
-	// Repeat Ratio
-	// (TotalScrobbles - UniqueArtists) / TotalScrobbles
-	totalS, _ := getTotalScrobbles(db, user)
-	totalA, _ := getTotalArtists(db, user)
-	if totalS > 0 {
-		ratio := float64(totalS - int64(totalA)) / float64(totalS)
-		lp.RepeatListeningRatio = math.Round(ratio*100) / 100
-	}
-
-	return lp, nil
-}
+	// New artists in past 12 months

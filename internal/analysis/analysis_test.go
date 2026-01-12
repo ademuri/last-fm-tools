@@ -158,6 +158,30 @@ func TestGenerateReport(t *testing.T) {
 	if !foundC1 {
 		t.Errorf("Album C1 not found in top albums")
 	}
+	// Verify Listening Patterns
+	// Artists: 
+	// A: 2 albums (A1, A2). Wait, A1 has tracks, A2 has tracks.
+	// B: 1 album (B1).
+	// C: 1 album (C1).
+	// Total 3 artists.
+	// Albums per artist: A=2, B=1, C=1.
+	// Median: 1, 1, 2 -> 1.
+	// Average: (2+1+1)/3 = 1.33 -> 1.3
+	
+	if report.ListeningPatterns.AllAlbumsPerArtistMedian != 1.0 {
+		t.Errorf("expected median 1.0, got %f", report.ListeningPatterns.AllAlbumsPerArtistMedian)
+	}
+	if report.ListeningPatterns.AllAlbumsPerArtistAverage != 1.3 {
+		t.Errorf("expected average 1.3, got %f", report.ListeningPatterns.AllAlbumsPerArtistAverage)
+	}
+	// Top 100 is same as All since only 3 artists
+	if report.ListeningPatterns.Top100ArtistsAlbumsMedian != 1.0 {
+		t.Errorf("expected top 100 median 1.0, got %f", report.ListeningPatterns.Top100ArtistsAlbumsMedian)
+	}
+	// Artists with 3+ albums: 0
+	if report.ListeningPatterns.ArtistsWith3PlusAlbums != 0 {
+		t.Errorf("expected 0 artists with 3+ albums, got %d", report.ListeningPatterns.ArtistsWith3PlusAlbums)
+	}
 }
 
 func TestFilterTags(t *testing.T) {
