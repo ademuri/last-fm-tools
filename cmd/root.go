@@ -71,7 +71,6 @@ func init() {
 
 	rootCmd.PersistentFlags().StringVarP(
 		&lastFmUser, "user", "u", "", "last.fm username to act on")
-	rootCmd.MarkPersistentFlagRequired("user")
 	viper.BindPFlag("user", rootCmd.PersistentFlags().Lookup("user"))
 
 	rootCmd.PersistentFlags().StringVarP(

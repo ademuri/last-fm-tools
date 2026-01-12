@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,6 +16,7 @@ limitations under the License.
 package cmd
 
 import (
+	"database/sql"
 	"fmt"
 	"os"
 	"text/tabwriter"
@@ -49,24 +50,30 @@ func listReports(dbPath string, user string) error {
 	}
 	defer db.Close()
 
-	rows, err := db.Query("SELECT name, email, run_day, types FROM Report WHERE user = ?", user)
+	var rows *sql.Rows
+	if user != "" {
+		rows, err = db.Query("SELECT user, name, email, run_day, types FROM Report WHERE user = ?", user)
+	} else {
+		rows, err = db.Query("SELECT user, name, email, run_day, types FROM Report")
+	}
 	if err != nil {
 		return fmt.Errorf("query reports: %w", err)
 	}
 	defer rows.Close()
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "NAME\tEMAIL\tRUN DAY\tTYPES")
+	fmt.Fprintln(w, "USER\tNAME\tEMAIL\tRUN DAY\tTYPES")
 
 	for rows.Next() {
+		var u string
 		var name string
 		var email string
 		var runDay int
 		var types string
-		if err := rows.Scan(&name, &email, &runDay, &types); err != nil {
+		if err := rows.Scan(&u, &name, &email, &runDay, &types); err != nil {
 			return fmt.Errorf("scan report: %w", err)
 		}
-		fmt.Fprintf(w, "%s\t%s\t%d\t%s\n", name, email, runDay, types)
+		fmt.Fprintf(w, "%s\t%s\t%s\t%d\t%s\n", u, name, email, runDay, types)
 	}
 
 	if err := rows.Err(); err != nil {
