@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 	"time"
 )
 
@@ -111,6 +112,36 @@ func parseSingleDatestring(ds string) (date ParsedDate, err error) {
 		}
 		date.Day = true
 		return
+	}
+
+	// Try relative date format (e.g., 30d, 12w, 6m, 1y)
+	// These are interpreted as "Ago" from now.
+	reRelative := regexp.MustCompile(`^(\d+)([dwmy])$`)
+	matches := reRelative.FindStringSubmatch(ds)
+	if len(matches) == 3 {
+		amount, err := strconv.Atoi(matches[1])
+		if err != nil {
+			return date, fmt.Errorf("parsing relative amount: %w", err)
+		}
+		
+		unit := matches[2]
+		now := time.Now()
+		
+		switch unit {
+		case "d":
+			date.Date = now.AddDate(0, 0, -amount)
+		case "w":
+			date.Date = now.AddDate(0, 0, -amount*7)
+		case "m":
+			date.Date = now.AddDate(0, -amount, 0)
+		case "y":
+			date.Date = now.AddDate(-amount, 0, 0)
+		}
+		
+		// For relative dates, treating them as exact points in time (Day=true) is usually safe
+		// for filtering logic which typically ignores the boolean flags and just uses .Date.
+		date.Day = true 
+		return date, nil
 	}
 
 	err = fmt.Errorf("Invalid format: %q", ds)

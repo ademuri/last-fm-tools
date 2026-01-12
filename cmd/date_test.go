@@ -106,6 +106,47 @@ func TestGetExplicitDateRange_valid(t *testing.T) {
 	}
 }
 
+func TestParseSingleDatestring_Relative(t *testing.T) {
+	tests := []struct {
+		input    string
+		unit     string
+		amount   int
+	}{
+		{"30d", "d", 30},
+		{"12w", "w", 12},
+		{"6m", "m", 6},
+		{"10y", "y", 10},
+	}
+
+	for _, tc := range tests {
+		pd, err := parseSingleDatestring(tc.input)
+		if err != nil {
+			t.Errorf("parseSingleDatestring(%q) returned error: %v", tc.input, err)
+			continue
+		}
+
+		// Calculate expected approximate time
+		now := time.Now()
+		var expected time.Time
+		switch tc.unit {
+		case "d":
+			expected = now.AddDate(0, 0, -tc.amount)
+		case "w":
+			expected = now.AddDate(0, 0, -tc.amount*7)
+		case "m":
+			expected = now.AddDate(0, -tc.amount, 0)
+		case "y":
+			expected = now.AddDate(-tc.amount, 0, 0)
+		}
+
+		// Check if result is close to expected (within 1 second)
+		diff := pd.Date.Sub(expected)
+		if diff < -time.Second || diff > time.Second {
+			t.Errorf("parseSingleDatestring(%q) = %v; want approx %v", tc.input, pd.Date, expected)
+		}
+	}
+}
+
 func TestGetExplicitDateRange_invalid(t *testing.T) {
 	_, _, err := getExplicitDateRange("2020", "abc")
 	if err == nil {
