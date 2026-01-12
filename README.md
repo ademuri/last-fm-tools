@@ -44,13 +44,12 @@ $ last-fm-tools forgotten --user=foo
 ```
 
 Options:
-- `--dormancy`: Minimum days since last play to qualify (default: 90)
 - `--min-artist`: Minimum scrobbles for artist inclusion (default: 10)
 - `--min-album`: Minimum scrobbles for album inclusion (default: 5)
 - `--results`: Max results shown per interest band (default: 10)
 - `--sort`: Sort order: 'dormancy' or 'listens' (default: 'dormancy')
 - `--last_listen_after`: Only include entities with last listen after this date. Supports absolute dates (YYYY, YYYY-MM, YYYY-MM-DD) or relative durations (e.g., 30d, 12w, 6m, 1y).
-- `--last_listen_before`: Only include entities with last listen before this date. Supports absolute dates or relative durations.
+- `--last_listen_before`: Only include entities with last listen before this date (default: 90d). Supports absolute dates or relative durations.
 - `--first_listen_after`: Only include entities with first listen after this date. Supports absolute dates or relative durations.
 - `--first_listen_before`: Only include entities with first listen before this date. Supports absolute dates or relative durations.
 

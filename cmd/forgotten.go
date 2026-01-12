@@ -13,7 +13,6 @@ import (
 )
 
 var (
-	dormancyDays       int
 	minArtistScrobbles int
 	minAlbumScrobbles  int
 	resultsPerBand     int
@@ -40,13 +39,12 @@ var forgottenCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(forgottenCmd)
 
-	forgottenCmd.Flags().IntVar(&dormancyDays, "dormancy", 90, "Minimum days since last play to qualify")
 	forgottenCmd.Flags().IntVar(&minArtistScrobbles, "min-artist", 10, "Minimum scrobbles for artist inclusion")
 	forgottenCmd.Flags().IntVar(&minAlbumScrobbles, "min-album", 5, "Minimum scrobbles for album inclusion")
 	forgottenCmd.Flags().IntVar(&resultsPerBand, "results", 10, "Max results shown per interest band")
 	forgottenCmd.Flags().StringVar(&sortBy, "sort", "dormancy", "Sort order: 'dormancy' or 'listens'")
 	forgottenCmd.Flags().StringVar(&lastListenAfterStr, "last_listen_after", "", "Only include entities with last listen after this date (YYYY-MM-DD)")
-	forgottenCmd.Flags().StringVar(&lastListenBeforeStr, "last_listen_before", "", "Only include entities with last listen before this date (YYYY-MM-DD)")
+	forgottenCmd.Flags().StringVar(&lastListenBeforeStr, "last_listen_before", "90d", "Only include entities with last listen before this date (YYYY-MM-DD or duration like 90d)")
 	forgottenCmd.Flags().StringVar(&firstListenAfterStr, "first_listen_after", "", "Only include entities with first listen after this date (YYYY-MM-DD)")
 	forgottenCmd.Flags().StringVar(&firstListenBeforeStr, "first_listen_before", "", "Only include entities with first listen before this date (YYYY-MM-DD)")
 }
@@ -75,8 +73,8 @@ func printForgotten(dbPath string) error {
 		}
 		lastListenBefore = pd.Date
 	} else {
-		// Default to dormancy
-		lastListenBefore = time.Now().AddDate(0, 0, -dormancyDays)
+		// Should not happen due to default value, but keep as safety
+		lastListenBefore = time.Now().AddDate(0, 0, -90)
 	}
 
 	var lastListenAfter time.Time
