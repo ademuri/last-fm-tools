@@ -40,14 +40,14 @@ const (
 	BandModerate  = "Moderate"
 
 	// Artist Thresholds
-	ThresholdArtistObsession = 100
-	ThresholdArtistStrong    = 30
-	ThresholdArtistModerate  = 10
+	ThresholdArtistObsession = 120
+	ThresholdArtistStrong    = 50
+	ThresholdArtistModerate  = 15
 
 	// Album Thresholds
-	ThresholdAlbumObsession = 50
-	ThresholdAlbumStrong    = 15
-	ThresholdAlbumModerate  = 5
+	ThresholdAlbumObsession = 60
+	ThresholdAlbumStrong    = 30
+	ThresholdAlbumModerate  = 10
 )
 
 // GetThreshold returns the minimum scrobbles for a given band and type (artist/album).
