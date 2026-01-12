@@ -16,7 +16,6 @@ limitations under the License.
 package cmd
 
 import (
-	"database/sql"
 	"fmt"
 	"net/smtp"
 	"os"
@@ -132,69 +131,10 @@ func sendEmail(config SendEmailConfig) error {
 		actions = append(actions, action)
 	}
 
-	out := `
-<html>
-  <head>
-<style>
-td {
-  padding: 0.1em 0.2em;
-}
-table, th, td {
-  border: 1px solid black;
-  border-collapse: collapse;
-}
-</style>
-  </head>
-  <body>
-`
-	for _, action := range actions {
-		out += `
-		<div>
-`
-		out += fmt.Sprintf("<h2>%s for %s %s to %s:</h2>\n", action.GetName(), config.User, config.Start.Format("2006-01-02"), config.End.Format("2006-01-02"))
-		analysis, err := action.GetResults(config.DbPath, config.User, config.Start, config.End)
-		if err != nil {
-			return fmt.Errorf("sendEmail: %w", err)
-		}
-
-		if len(analysis.results) <= 1 {
-			// No listens found
-			out += "<div>No listens found.</div>\n"
-		} else {
-			out += `
-			<table>
-				<thead>
-					<tr>
-`
-			for _, header := range analysis.results[0] {
-				out += fmt.Sprintf("<th>%s</th>", header)
-			}
-			out += `				</tr>
-			</thead>`
-
-			for _, row := range analysis.results[1:] {
-				out += "<tr>\n"
-				for _, column := range row {
-					out += fmt.Sprintf("<td>%s</td>\n", column)
-				}
-				out += "</tr>\n"
-
-			}
-			out += `
-				</tbody>
-			</table>
-`
-		}
-		out += fmt.Sprintf(`<div>%s</div>
-		</div>`, analysis.summary)
+	subject, out, err := generateEmailContent(config, actions)
+	if err != nil {
+		return err
 	}
-
-	subjectSuffix := ""
-	if len(config.ReportName) > 0 {
-		subjectSuffix = ": " + config.ReportName
-	}
-	// Subject line format: Listening report for <User> <Start> to <End> <Suffix>
-	subject := fmt.Sprintf("Listening report for %s %s to %s%s", config.User, config.Start.Format("2006-01-02"), config.End.Format("2006-01-02"), subjectSuffix)
 
 	if config.DryRun {
 		fmt.Printf("Would have sent email: \nsubject: %s\n%s\n", subject, out)
@@ -234,6 +174,74 @@ table, th, td {
 	return nil
 }
 
+func generateEmailContent(config SendEmailConfig, actions []Analyser) (subject string, body string, err error) {
+	out := `
+<html>
+  <head>
+<style>
+td {
+  padding: 0.1em 0.2em;
+}
+table, th, td {
+  border: 1px solid black;
+  border-collapse: collapse;
+}
+</style>
+  </head>
+  <body>
+`
+	for _, action := range actions {
+		out += `
+		<div>
+`
+		out += fmt.Sprintf("<h2>%s for %s %s to %s:</h2>\n", action.GetName(), config.User, config.Start.Format("2006-01-02"), config.End.Format("2006-01-02"))
+		analysis, err := action.GetResults(config.DbPath, config.User, config.Start, config.End)
+		if err != nil {
+			return "", "", fmt.Errorf("getting results for %s: %w", action.GetName(), err)
+		}
+
+		if len(analysis.results) <= 1 {
+			// No listens found
+			out += "<div>No listens found.</div>\n"
+		} else {
+			out += `
+			<table>
+				<thead>
+					<tr>
+`
+			for _, header := range analysis.results[0] {
+				out += fmt.Sprintf("<th>%s</th>", header)
+			}
+			out += `				</tr>
+			</thead>`
+
+			for _, row := range analysis.results[1:] {
+				out += "<tr>\n"
+				for _, column := range row {
+					out += fmt.Sprintf("<td>%s</td>\n", column)
+				}
+				out += "</tr>\n"
+
+			}
+			out += `
+				</tbody>
+			</table>
+`
+		}
+		out += fmt.Sprintf(`<div>%s</div>
+		</div>`, analysis.summary)
+	}
+
+	subjectSuffix := ""
+	if len(config.ReportName) > 0 {
+		subjectSuffix = ": " + config.ReportName
+	}
+	// Subject line format: Listening report for <User> <Start> to <End> <Suffix>
+	subject = fmt.Sprintf("Listening report for %s %s to %s%s", config.User, config.Start.Format("2006-01-02"), config.End.Format("2006-01-02"), subjectSuffix)
+
+	return subject, out, nil
+}
+
 func getActionFromName(actionName string) (Analyser, error) {
 	actionMap := map[string]Analyser{
 		"top-artists": TopArtistsAnalyzer{}.SetConfig(AnalyserConfig{20, 15}),
@@ -248,29 +256,4 @@ func getActionFromName(actionName string) (Analyser, error) {
 	}
 
 	return action, nil
-}
-
-func getNumYearsOfListeningData(db *sql.DB, user string) (int, error) {
-	// Note: last.fm seems to have some junk listening data with epoch timestamps like 1, 2, 3...
-	// Just ignore those.
-	query, err := db.Query("SELECT date FROM Listen WHERE user = ? AND date > 10000 ORDER BY date ASC LIMIT 1;", user)
-	if err != nil {
-		err = fmt.Errorf("query(%q): %w", user, err)
-		return 0, err
-	}
-	defer query.Close()
-
-	if !query.Next() {
-		return 0, fmt.Errorf("No listens found for user %q", user)
-	}
-
-	var oldest time.Time
-	query.Scan(&oldest)
-
-	now := time.Now()
-	years := now.Year() - oldest.Year()
-	if now.Month() > oldest.Month() || (now.Month() == oldest.Month() && now.Day() >= oldest.Day()) {
-		years++
-	}
-	return years, nil
 }
