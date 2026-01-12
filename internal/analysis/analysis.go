@@ -294,10 +294,8 @@ func getTopAlbumsForArtist(db *sql.DB, user, artist string, start, end time.Time
 		if err := rows.Scan(&name, &count); err != nil {
 			return nil, err
 		}
-		// Prompt format: "Album Name (year)" - Note: we don't have year in DB usually, just name.
-		// DB schema has Album table, but no year column in create-tables.sql.
-		// So we just return Name.
-		albums = append(albums, name)
+		// Format: "Album Name (count)"
+		albums = append(albums, fmt.Sprintf("%s (%d)", name, count))
 	}
 	return albums, nil
 }

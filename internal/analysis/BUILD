@@ -12,7 +12,10 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["analysis_test.go"],
+    srcs = [
+        "analysis_test.go",
+        "top_albums_format_test.go",
+    ],
     embed = [":go_default_library"],
     deps = [
         "//internal/migration:go_default_library",
