@@ -70,6 +70,7 @@ Options:
 - `--work-streak`: Threshold for consecutive silent working days to trigger a work scrobbler alert (default: 3).
 - `--other-streak`: Threshold for consecutive silent days (off-hours) to trigger a general/mobile scrobbler alert (default: 3).
 - `--weekend-streak`: Threshold for consecutive silent weekend days to trigger a weekend scrobbler alert (default: 4).
+- `--cooldown-days`: Days to wait before repeating a warning (default: 0).
 - `--timezone`: Timezone for determining work hours (e.g., "America/Los_Angeles").
 - `--work-hours`: Work hours interval in start-end format (default: "09-17").
 
