@@ -87,3 +87,10 @@ CREATE TABLE AlbumTag (
   FOREIGN KEY (tag) REFERENCES Tag(name),
   PRIMARY KEY (artist, album, tag)
 );
+
+CREATE TABLE CommandHistory (
+  command_name TEXT,
+  user TEXT,
+  last_run DATETIME,
+  PRIMARY KEY (command_name, user)
+);

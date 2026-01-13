@@ -189,6 +189,82 @@ func TestCheckSourcesAnalyzer_GetResults(t *testing.T) {
 			}
 		})
 	})
+
+	t.Run("Cooldown Logic", func(t *testing.T) {
+		dbRaw, dbPath := createTestDb(t)
+		defer dbRaw.Close()
+
+		// Setup failure scenario (10 days silence)
+		for i := 0; i < 10; i++ {
+			d := time.Now().AddDate(0, 0, -i)
+			addListenForDB(t, dbPath, user, time.Date(d.Year(), d.Month(), d.Day(), 20, 0, 0, 0, time.Local))
+		}
+
+		// 1. Run with Cooldown = 1. Should Warn + Update DB.
+		oldCooldown := cooldownDays
+		cooldownDays = 1
+		defer func() { cooldownDays = oldCooldown }()
+
+		err := checkSources(dbPath, user, 14, 0)
+		if err != nil {
+			t.Errorf("checkSources failed: %v", err)
+		}
+
+		// Check DB for CommandHistory
+		s, _ := store.New(dbPath)
+		lastRun, err := s.GetCommandLastRun(user, "check-sources")
+		s.Close()
+		if err != nil {
+			t.Fatalf("GetCommandLastRun failed: %v", err)
+		}
+		if lastRun.IsZero() {
+			t.Error("Expected lastRun to be set, got Zero")
+		}
+
+		// 2. Run again immediately. Should Suppress (no DB update, but existing timestamp remains).
+		// Set lastRun to 2 hours ago.
+		twoHoursAgo := time.Now().Add(-2 * time.Hour)
+		// Truncate to second precision because DB might lose precision or formatting might differ slightly
+		twoHoursAgo = twoHoursAgo.Truncate(time.Second) 
+		
+		s, _ = store.New(dbPath)
+		s.SetCommandLastRun(user, "check-sources", twoHoursAgo)
+		s.Close()
+
+		err = checkSources(dbPath, user, 14, 0)
+		if err != nil {
+			t.Errorf("checkSources failed: %v", err)
+		}
+
+		s, _ = store.New(dbPath)
+		lastRunAfter, _ := s.GetCommandLastRun(user, "check-sources")
+		s.Close()
+
+		// If suppressed, lastRunAfter should still be twoHoursAgo.
+		if !lastRunAfter.Equal(twoHoursAgo) {
+			t.Errorf("Expected timestamp to remain unchanged (suppressed), but it changed from %v to %v", twoHoursAgo, lastRunAfter)
+		}
+
+		// 3. Run with old timestamp (> cooldown). Should Warn + Update.
+		twoDaysAgo := time.Now().Add(-48 * time.Hour)
+		twoDaysAgo = twoDaysAgo.Truncate(time.Second)
+		s, _ = store.New(dbPath)
+		s.SetCommandLastRun(user, "check-sources", twoDaysAgo)
+		s.Close()
+
+		err = checkSources(dbPath, user, 14, 0)
+		if err != nil {
+			t.Errorf("checkSources failed: %v", err)
+		}
+
+		s, _ = store.New(dbPath)
+		lastRunAfter2, _ := s.GetCommandLastRun(user, "check-sources")
+		s.Close()
+
+		if lastRunAfter2.Equal(twoDaysAgo) {
+			t.Errorf("Expected timestamp to update (warned), but it stayed %v", twoDaysAgo)
+		}
+	})
 }
 
 func addListenForDB(t *testing.T, dbPath, user string, ts time.Time) {
