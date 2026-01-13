@@ -23,3 +23,7 @@ $ bash gemini-build.sh build
 # OR
 $ bash gemini-build.sh test
 ```
+
+## General Instructions
+
+Prefer to create (Git) commits for small units of work, e.g. a single bugfix.
