@@ -39,7 +39,11 @@ var addReportCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		err := addReport(viper.GetString("database"), viper.GetString("name"), viper.GetString("user"), viper.GetString("dest"), viper.GetInt("run_day"), args, params)
+		dest, _ := cmd.Flags().GetString("dest")
+		name, _ := cmd.Flags().GetString("name")
+		runDay, _ := cmd.Flags().GetInt("run_day")
+
+		err := addReport(viper.GetString("database"), name, viper.GetString("user"), dest, runDay, args, params)
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)
@@ -72,7 +76,7 @@ func init() {
 }
 
 func addReport(dbPath string, name string, user string, to string, runDay int, types []string, params []string) error {
-	if runDay < 1 || runDay > 31 {
+	if runDay < 0 || runDay > 31 {
 		return fmt.Errorf("run_day out of range: %d", runDay)
 	}
 

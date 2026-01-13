@@ -195,19 +195,19 @@ func sendEmail(config SendEmailConfig) error {
 		if err != nil {
 			return fmt.Errorf("sendEmail: %w", err)
 		}
-	}
 
-	if len(config.ReportName) > 0 {
-		db, err := createDatabase(config.DbPath)
-		if err != nil {
-			return fmt.Errorf("Recording last run: %w", err)
+		if len(config.ReportName) > 0 {
+			db, err := createDatabase(config.DbPath)
+			if err != nil {
+				return fmt.Errorf("Recording last run: %w", err)
+			}
+			now := time.Now()
+			_, err = db.Exec("UPDATE Report SET sent = ? WHERE user = ? AND name = ? AND email = ?", now, config.User, config.ReportName, config.To)
+			if err != nil {
+				return fmt.Errorf("Recording last run: %w", err)
+			}
+			db.Close()
 		}
-		now := time.Now()
-		_, err = db.Exec("UPDATE Report SET sent = ? WHERE user = ? AND name = ? AND email = ?", now, config.User, config.ReportName, config.To)
-		if err != nil {
-			return fmt.Errorf("Recording last run: %w", err)
-		}
-		db.Close()
 	}
 
 	return nil
@@ -234,13 +234,17 @@ table, th, td {
 		<div>
 `
 		out += fmt.Sprintf("<h2>%s for %s %s to %s:</h2>\n", action.GetName(), config.User, config.Start.Format("2006-01-02"), config.End.Format("2006-01-02"))
-		analysis, err := action.GetResults(config.DbPath, config.User, config.Start, config.End)
-		if err != nil {
-			return "", "", fmt.Errorf("getting results for %s: %w", action.GetName(), err)
-		}
-
-		if analysis.BodyOverride != "" {
-			out += analysis.BodyOverride
+		        		analysis, err := action.GetResults(config.DbPath, config.User, config.Start, config.End)
+		        		if err == ErrSkipReport {
+		        			fmt.Printf("Skipping report %q (check-sources): no issues detected.\n", config.ReportName)
+		        			return "", "", nil
+		        		}
+		        		if err != nil {
+		        
+		            return "", "", fmt.Errorf("getting results for %s: %w", action.GetName(), err)
+		        }
+		
+		        if analysis.BodyOverride != "" {			out += analysis.BodyOverride
 		} else if len(analysis.results) <= 1 {
 			// No listens found
 			out += "<div>No listens found.</div>\n"
@@ -293,6 +297,7 @@ func getActionFromName(actionName string) (Analyser, error) {
 		"forgotten":    &ForgottenAnalyzer{},
 		"top-n":        &TopNAnalyzer{},
 		"taste-report": &TasteReportAnalyzer{},
+		"check-sources": &CheckSourcesAnalyzer{},
 	}
 
 	action, ok := actionMap[actionName]

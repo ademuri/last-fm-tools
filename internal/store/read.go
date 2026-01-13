@@ -126,3 +126,37 @@ func (s *Store) GetAlbumsNeedingTagUpdate(interval time.Duration) ([]AlbumKey, e
 	}
 	return albums, rows.Err()
 }
+
+func (s *Store) GetListensInRange(user string, start, end time.Time) ([]time.Time, error) {
+	startUTS := start.Unix()
+	endUTS := end.Unix()
+
+	query := `
+		SELECT date 
+		FROM Listen 
+		WHERE user = ? 
+		AND CAST(date AS INTEGER) >= ? 
+		AND CAST(date AS INTEGER) < ?
+		ORDER BY CAST(date AS INTEGER) ASC
+	`
+
+	rows, err := s.db.Query(query, user, startUTS, endUTS)
+	if err != nil {
+		return nil, fmt.Errorf("querying listens: %w", err)
+	}
+	defer rows.Close()
+
+	var listens []time.Time
+	for rows.Next() {
+		var dateStr string
+		if err := rows.Scan(&dateStr); err != nil {
+			return nil, err
+		}
+		t, err := parseDate(dateStr)
+		if err != nil {
+			continue
+		}
+		listens = append(listens, t)
+	}
+	return listens, rows.Err()
+}

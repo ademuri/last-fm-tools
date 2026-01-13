@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -122,21 +123,49 @@ func sendReports(config SendReportsConfig) error {
 		}
 
 		emailConfig.Types = strings.Split(types, ",")
-		toSendThisMonth := time.Date(now.Year(), now.Month(), runDay, 0, 0, 0, 0, now.Location())
-		toSendLastMonth := time.Date(now.Year(), now.Month()-1, runDay, 0, 0, 0, 0, now.Location())
-
-		// Report covers the previous month
-		emailConfig.Start = time.Date(now.Year(), now.Month()-1, 1, 0, 0, 0, 0, now.Location())
-		emailConfig.End = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
-
-		if !config.Force {
-			if sent.After(toSendThisMonth) {
-				fmt.Printf("Report (%q, %q) was already sent this month on %s, not sending.\n", emailConfig.User, emailConfig.ReportName, sent.Format("2006-01-02"))
-				continue
+		
+		// Parse cool_off_days
+		coolOffDays := 1 // Default to 1 day for daily reports
+		if len(emailConfig.Params) > 0 {
+			// Check first param map for cool_off_days (assuming generic config)
+			if val, ok := emailConfig.Params[0]["cool_off_days"]; ok {
+				if d, err := strconv.Atoi(val); err == nil {
+					coolOffDays = d
+				}
 			}
-			if now.Before(toSendThisMonth) && sent.After(toSendLastMonth) {
-				fmt.Printf("Report (%q, %q) was already sent for last month on %s, not sending.\n", emailConfig.User, emailConfig.ReportName, sent.Format("2006-01-02"))
-				continue
+		}
+
+		if runDay == 0 {
+			// Daily / Periodic Report
+			if !config.Force && !sent.IsZero() {
+				daysSinceSent := time.Since(sent).Hours() / 24
+				if daysSinceSent < float64(coolOffDays) {
+					fmt.Printf("Report (%q, %q) sent %.1f days ago (cool-off: %d days), not sending.\n", emailConfig.User, emailConfig.ReportName, daysSinceSent, coolOffDays)
+					continue
+				}
+			}
+			// For daily reports, Start/End might be overridden by the analyzer config (e.g. "days" param),
+			// but we need defaults. Default to last 30 days?
+			emailConfig.Start = now.AddDate(0, 0, -30)
+			emailConfig.End = now
+		} else {
+			// Monthly Report
+			toSendThisMonth := time.Date(now.Year(), now.Month(), runDay, 0, 0, 0, 0, now.Location())
+			toSendLastMonth := time.Date(now.Year(), now.Month()-1, runDay, 0, 0, 0, 0, now.Location())
+
+			// Report covers the previous month
+			emailConfig.Start = time.Date(now.Year(), now.Month()-1, 1, 0, 0, 0, 0, now.Location())
+			emailConfig.End = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+
+			if !config.Force {
+				if sent.After(toSendThisMonth) {
+					fmt.Printf("Report (%q, %q) was already sent this month on %s, not sending.\n", emailConfig.User, emailConfig.ReportName, sent.Format("2006-01-02"))
+					continue
+				}
+				if now.Before(toSendThisMonth) && sent.After(toSendLastMonth) {
+					fmt.Printf("Report (%q, %q) was already sent for last month on %s, not sending.\n", emailConfig.User, emailConfig.ReportName, sent.Format("2006-01-02"))
+					continue
+				}
 			}
 		}
 

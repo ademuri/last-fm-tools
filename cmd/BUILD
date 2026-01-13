@@ -6,6 +6,7 @@ go_library(
         "addReport.go",
         "analyser.go",
         "authenticate.go",
+        "checkSources.go",
         "date.go",
         "db_legacy.go",
         "deleteReport.go",

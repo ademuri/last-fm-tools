@@ -17,11 +17,14 @@ package cmd
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/olekukonko/tablewriter"
 )
+
+var ErrSkipReport = errors.New("skip report")
 
 type Analysis struct {
 	results      [][]string
