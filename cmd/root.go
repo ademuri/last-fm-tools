@@ -39,9 +39,15 @@ var rootCmd = &cobra.Command{
 	Use:   "last-fm-tools",
 	Short: "Performs analysis on last.fm listening data",
 	Long:  `Someday, this will do things.`,
-	// Uncomment the following line if your bare application
-	// has an action associated with it:
-	//	Run: func(cmd *cobra.Command, args []string) { },
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		required := []string{"api_key", "secret", "from"}
+		for _, req := range required {
+			if viper.GetString(req) == "" {
+				return fmt.Errorf("required flag(s) \"%s\" not set", req)
+			}
+		}
+		return nil
+	},
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -61,12 +67,10 @@ func init() {
 
 	rootCmd.PersistentFlags().StringVarP(
 		&lastFmApiKey, "api_key", "", "", "last.fm API key")
-	rootCmd.MarkPersistentFlagRequired("api_key")
 	viper.BindPFlag("api_key", rootCmd.PersistentFlags().Lookup("api_key"))
 
 	rootCmd.PersistentFlags().StringVarP(
 		&lastFmSecret, "secret", "", "", "last.fm secret")
-	rootCmd.MarkPersistentFlagRequired("secret")
 	viper.BindPFlag("secret", rootCmd.PersistentFlags().Lookup("secret"))
 
 	rootCmd.PersistentFlags().StringVarP(
@@ -85,7 +89,6 @@ func init() {
 
 	var from string
 	rootCmd.PersistentFlags().StringVar(&from, "from", "", "From email address")
-	rootCmd.MarkPersistentFlagRequired("from")
 	viper.BindPFlag("from", rootCmd.PersistentFlags().Lookup("from"))
 }
 
