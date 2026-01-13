@@ -86,11 +86,10 @@ track := "Come Together"
 	// Run printTopN
 	var out bytes.Buffer
 	// Range: 2 months ago to now
-	start := time.Now().AddDate(0, -2, 0).Format("2006-01-02")
-	end := time.Now().Format("2006-01-02")
-	args := []string{start, end}
+	startTime := time.Now().AddDate(0, -2, 0)
+	endTime := time.Now()
 
-	err = printTopN(&out, dbPath, args)
+	err = printTopN(&out, dbPath, startTime, endTime, limitArtists, limitAlbums, limitTracks, limitTags)
 	if err != nil {
 		t.Fatalf("printTopN failed: %v", err)
 	}

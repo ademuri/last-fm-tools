@@ -35,8 +35,8 @@ func TestSendReports(t *testing.T) {
 		t.Fatalf("createListenForDate(%q) error: %w", user2, err)
 	}
 
-	err = addReport(dbPath, "test report", user1, "testuser@gmail.com", 1, []string{"top-albums", "top-artists"})
-	err = addReport(dbPath, "other test report", user2, "otheruser@gmail.com", 1, []string{"new-albums", "new-artists"})
+	err = addReport(dbPath, "test report", user1, "testuser@gmail.com", 1, []string{"top-albums", "top-artists"}, nil)
+	err = addReport(dbPath, "other test report", user2, "otheruser@gmail.com", 1, []string{"new-albums", "new-artists"}, nil)
 	if err != nil {
 		t.Fatalf("addReport() error: %w", err)
 	}
@@ -71,8 +71,8 @@ func TestSendReportsFilteringAndForce(t *testing.T) {
 		t.Fatalf("createListenForDate(%q) error: %w", user2, err)
 	}
 
-	err = addReport(dbPath, "test report", user1, "testuser@gmail.com", 1, []string{"top-albums", "top-artists"})
-	err = addReport(dbPath, "other test report", user2, "otheruser@gmail.com", 1, []string{"new-albums", "new-artists"})
+	err = addReport(dbPath, "test report", user1, "testuser@gmail.com", 1, []string{"top-albums", "top-artists"}, nil)
+	err = addReport(dbPath, "other test report", user2, "otheruser@gmail.com", 1, []string{"new-albums", "new-artists"}, nil)
 	if err != nil {
 		t.Fatalf("addReport() error: %w", err)
 	}

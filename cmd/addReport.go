@@ -16,6 +16,7 @@ limitations under the License.
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -31,7 +32,8 @@ var addReportCmd = &cobra.Command{
 	Long:  ``,
 	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		err := addReport(viper.GetString("database"), viper.GetString("name"), viper.GetString("user"), viper.GetString("dest"), viper.GetInt("run_day"), args)
+		params, _ := cmd.Flags().GetStringToString("params")
+		err := addReport(viper.GetString("database"), viper.GetString("name"), viper.GetString("user"), viper.GetString("dest"), viper.GetInt("run_day"), args, params)
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)
@@ -59,9 +61,11 @@ func init() {
 	addReportCmd.Flags().IntVar(&runDay, "run_day", 0, "Which day of the month to run this report on")
 	addReportCmd.MarkFlagRequired("runDay")
 	viper.BindPFlag("run_day", addReportCmd.Flags().Lookup("run_day"))
+	
+	addReportCmd.Flags().StringToString("params", nil, "Parameters for reports (e.g. --params top-n=n=20)")
 }
 
-func addReport(dbPath string, name string, user string, to string, runDay int, types []string) error {
+func addReport(dbPath string, name string, user string, to string, runDay int, types []string, params map[string]string) error {
 	if runDay < 1 || runDay > 31 {
 		return fmt.Errorf("run_day out of range: %d", runDay)
 	}
@@ -85,8 +89,36 @@ func addReport(dbPath string, name string, user string, to string, runDay int, t
 	if err != nil {
 		return nil
 	}
+	
+	// Convert params map to JSON
+	// The input params is map[string]string where key is report name and value is params string.
+	// We need to parse the params string into map[string]string for the storage if we want structured access, 
+	// OR just store the raw string and parse later? 
+	// Better to store structured: map[string]map[string]string
+	
+	structuredParams := make(map[string]map[string]string)
+	for k, v := range params {
+		// v is like "n=20,min=5" (comma separated? or custom format?)
+		// StringToString uses comma to separate key=value pairs for the outer map.
+		// So "top-n=n=20,min=5" -> key: "top-n", value: "n=20,min=5"
+		// We'll treat the value as k=v pairs comma separated.
+		pMap := make(map[string]string)
+		pairs := strings.Split(v, ",")
+		for _, pair := range pairs {
+			kv := strings.SplitN(pair, "=", 2)
+			if len(kv) == 2 {
+				pMap[kv[0]] = kv[1]
+			}
+		}
+		structuredParams[k] = pMap
+	}
 
-	_, err = db.Exec("INSERT INTO Report(user, name, email, run_day, types) VALUES (?, ?, ?, ?, ?)", user, name, to, runDay, strings.Join(types, ","))
+	paramsJSON, err := json.Marshal(structuredParams)
+	if err != nil {
+		return fmt.Errorf("marshalling params: %w", err)
+	}
+
+	_, err = db.Exec("INSERT INTO Report(user, name, email, run_day, types, params) VALUES (?, ?, ?, ?, ?, ?)", user, name, to, runDay, strings.Join(types, ","), string(paramsJSON))
 	if err != nil {
 		return err
 	}

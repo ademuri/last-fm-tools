@@ -17,6 +17,7 @@ package cmd
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -75,7 +76,7 @@ func sendReports(config SendReportsConfig) error {
 	if err != nil {
 		return err
 	}
-	reports, err := db.Query("SELECT name, user, email, sent, run_day, types FROM Report")
+	reports, err := db.Query("SELECT name, user, email, sent, run_day, types, params FROM Report")
 	if err != nil {
 		return fmt.Errorf("Querying reports: %w", err)
 	}
@@ -86,6 +87,7 @@ func sendReports(config SendReportsConfig) error {
 			sentOrNull sql.NullTime
 			runDay     int
 			types      string
+			params     sql.NullString
 		)
 
 		now := time.Now()
@@ -96,7 +98,7 @@ func sendReports(config SendReportsConfig) error {
 			SMTPUsername: config.SMTPUsername,
 			SMTPPassword: config.SMTPPassword,
 		}
-		err = reports.Scan(&emailConfig.ReportName, &emailConfig.User, &emailConfig.To, &sentOrNull, &runDay, &types)
+		err = reports.Scan(&emailConfig.ReportName, &emailConfig.User, &emailConfig.To, &sentOrNull, &runDay, &types, &params)
 		if err != nil {
 			return fmt.Errorf("Getting report params: %w", err)
 		}
@@ -108,6 +110,15 @@ func sendReports(config SendReportsConfig) error {
 		var sent time.Time
 		if sentOrNull.Valid {
 			sent = sentOrNull.Time
+		}
+
+		if params.Valid && params.String != "" {
+			var p map[string]map[string]string
+			if err := json.Unmarshal([]byte(params.String), &p); err != nil {
+				fmt.Printf("Warning: failed to unmarshal params for report %s: %v\n", emailConfig.ReportName, err)
+			} else {
+				emailConfig.Params = p
+			}
 		}
 
 		emailConfig.Types = strings.Split(types, ",")

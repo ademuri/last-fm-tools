@@ -97,9 +97,8 @@ func TestGenerateEmailContent(t *testing.T) {
 		End:        end,
 	}
 
-	// Use actual analyzers for integration testing
 	actions := []Analyser{
-		TopArtistsAnalyzer{}.SetConfig(AnalyserConfig{20, 0}),
+		(&TopArtistsAnalyzer{}).SetConfig(AnalyserConfig{20, 0}),
 	}
 
 	subject, body, err := generateEmailContent(config, actions)
@@ -152,7 +151,7 @@ func TestGenerateEmailContentNoData(t *testing.T) {
 	}
 
 	actions := []Analyser{
-		TopArtistsAnalyzer{}.SetConfig(AnalyserConfig{20, 0}),
+		(&TopArtistsAnalyzer{}).SetConfig(AnalyserConfig{20, 0}),
 	}
 
 	subject, body, err := generateEmailContent(config, actions)

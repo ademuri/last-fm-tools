@@ -53,6 +53,45 @@ Options:
 - `--first_listen_after`: Only include entities with first listen after this date. Supports absolute dates or relative durations.
 - `--first_listen_before`: Only include entities with first listen before this date. Supports absolute dates or relative durations.
 
+## email
+
+Sends an email report to the specified address. Supports multiple analysis types.
+
+```bash
+$ last-fm-tools email user@example.com top-artists top-albums 2023-01
+```
+
+Analysis types: `top-artists`, `top-albums`, `new-artists`, `new-albums`, `forgotten`, `top-n`, `taste-report`.
+
+You can pass parameters to specific reports using the `--params` flag:
+```bash
+$ last-fm-tools email user@example.com top-n forgotten --params "top-n=artists=20,albums=10" --params "forgotten=min-artist=20"
+```
+
+## add-report
+
+Adds a report configuration to the database to be sent periodically via `send-reports`.
+
+```bash
+$ last-fm-tools add-report --name="Monthly Summary" --dest=user@example.com --run_day=1 top-n taste-report --params "top-n=artists=20"
+```
+
+## list-reports
+
+Lists all configured periodic reports.
+
+```bash
+$ last-fm-tools list-reports
+```
+
+## send-reports
+
+Checks the database for reports that need to be sent (based on `run_day`) and emails them. It also updates the database with the latest scrobbles before sending.
+
+```bash
+$ last-fm-tools send-reports
+```
+
 ## Configuration
 
 Configuration options

@@ -20,7 +20,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -39,7 +41,28 @@ var topNCmd = &cobra.Command{
 	Long:  `Generates a comprehensive report including top artists and albums over a specified period.`,
 	Args:  cobra.RangeArgs(1, 2),
 	Run: func(cmd *cobra.Command, args []string) {
-		err := printTopN(os.Stdout, viper.GetString("database"), args)
+		start, end, err := parseDateRangeFromArgs(args)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+
+		analyzer := &TopNAnalyzer{}
+		// Set config from flags
+		params := map[string]string{
+			"artists": strconv.Itoa(limitArtists),
+			"albums":  strconv.Itoa(limitAlbums),
+			"tracks":  strconv.Itoa(limitTracks),
+			"tags":    strconv.Itoa(limitTags),
+		}
+		analyzer.Configure(params)
+
+		// GetResults returns Analysis with BodyOverride (HTML)
+		// For CLI we want text.
+		// So we might need to keep printTopN or make TopNAnalyzer support text output too?
+		// Or just stick with printTopN for CLI as they are quite different.
+		// I will keep printTopN for CLI usage as it writes to io.Writer and formatting is different (markdown-ish).
+		err = printTopN(os.Stdout, viper.GetString("database"), start, end, limitArtists, limitAlbums, limitTracks, limitTags)
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)
@@ -55,17 +78,140 @@ func init() {
 	topNCmd.Flags().IntVar(&limitTags, "tags", 5, "Number of top tags to show for artists and albums")
 }
 
-func printTopN(out io.Writer, dbPath string, args []string) error {
-	start, end, err := parseDateRangeFromArgs(args)
-	if err != nil {
-		return err
+type TopNAnalyzer struct {
+	LimitArtists int
+	LimitAlbums  int
+	LimitTracks  int
+	LimitTags    int
+}
+
+func (t *TopNAnalyzer) Configure(params map[string]string) error {
+	t.LimitArtists = 10
+	t.LimitAlbums = 10
+	t.LimitTracks = 10
+	t.LimitTags = 5
+
+	if val, ok := params["artists"]; ok {
+		v, err := strconv.Atoi(val)
+		if err != nil {
+			return err
+		}
+		t.LimitArtists = v
 	}
+	if val, ok := params["albums"]; ok {
+		v, err := strconv.Atoi(val)
+		if err != nil {
+			return err
+		}
+		t.LimitAlbums = v
+	}
+	if val, ok := params["tracks"]; ok {
+		v, err := strconv.Atoi(val)
+		if err != nil {
+			return err
+		}
+		t.LimitTracks = v
+	}
+	if val, ok := params["tags"]; ok {
+		v, err := strconv.Atoi(val)
+		if err != nil {
+			return err
+		}
+		t.LimitTags = v
+	}
+	return nil
+}
+
+func (t *TopNAnalyzer) GetName() string {
+	return "Top N Report"
+}
+
+func (t *TopNAnalyzer) GetResults(dbPath string, user string, start time.Time, end time.Time) (Analysis, error) {
+	var a Analysis
+	db, err := openDb(dbPath)
+	if err != nil {
+		return a, fmt.Errorf("openDb: %w", err)
+	}
+	defer db.Close()
+
+	var sb strings.Builder
+
+	// 1. Top Artists
+	if t.LimitArtists > 0 {
+		rows, err := db.Query(`
+		SELECT Track.artist, COUNT(Listen.id)
+		FROM Listen
+		INNER JOIN Track ON Track.id = Listen.track
+		WHERE user = ? AND Listen.date BETWEEN ? AND ?
+		GROUP BY Track.artist
+		ORDER BY COUNT(*) DESC
+		LIMIT ?`, user, start.Unix(), end.Unix(), t.LimitArtists)
+		if err != nil {
+			return a, err
+		}
+		defer rows.Close()
+
+		sb.WriteString(fmt.Sprintf("<h3>Top %d Artists</h3>", t.LimitArtists))
+		sb.WriteString("<table><thead><tr><th>Rank</th><th>Artist</th><th>Scrobbles</th><th>Tags</th></tr></thead><tbody>")
+		i := 1
+		for rows.Next() {
+			var name string
+			var count int64
+			if err := rows.Scan(&name, &count); err != nil {
+				return a, err
+			}
+			tags, _ := getArtistTags(db, name, t.LimitTags)
+			sb.WriteString(fmt.Sprintf("<tr><td>%d</td><td>%s</td><td>%d</td><td>%s</td></tr>", i, name, count, tags))
+			i++
+		}
+		sb.WriteString("</tbody></table>")
+		rows.Close()
+	}
+
+	// 2. Top Albums
+	if t.LimitAlbums > 0 {
+		rows, err := db.Query(`
+		SELECT Track.artist, Track.album, COUNT(Listen.id)
+		FROM Listen
+		INNER JOIN Track ON Track.id = Listen.track
+		WHERE user = ? AND Listen.date BETWEEN ? AND ?
+		GROUP BY Track.artist, Track.album
+		ORDER BY COUNT(*) DESC
+		LIMIT ?`, user, start.Unix(), end.Unix(), t.LimitAlbums)
+		if err != nil {
+			return a, err
+		}
+		defer rows.Close()
+
+		sb.WriteString(fmt.Sprintf("<h3>Top %d Albums</h3>", t.LimitAlbums))
+		sb.WriteString("<table><thead><tr><th>Rank</th><th>Album</th><th>Artist</th><th>Scrobbles</th><th>Tags</th></tr></thead><tbody>")
+		i := 1
+		for rows.Next() {
+			var artist, album string
+			var count int64
+			if err := rows.Scan(&artist, &album, &count); err != nil {
+				return a, err
+			}
+			tags, _ := getAlbumTags(db, artist, album, t.LimitTags)
+			sb.WriteString(fmt.Sprintf("<tr><td>%d</td><td>%s</td><td>%s</td><td>%d</td><td>%s</td></tr>", i, album, artist, count, tags))
+			i++
+		}
+		sb.WriteString("</tbody></table>")
+		rows.Close()
+	}
+
+	a.BodyOverride = sb.String()
+	return a, nil
+}
+
+func printTopN(out io.Writer, dbPath string, start, end time.Time, limitArtists, limitAlbums, limitTracks, limitTags int) error {
 	user := viper.GetString("user")
 
 	db, err := openDb(dbPath)
 	if err != nil {
 		return fmt.Errorf("openDb: %w", err)
 	}
+	defer db.Close()
 
 	exists, err := dbExists(db)
 	if err != nil {

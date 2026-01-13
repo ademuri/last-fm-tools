@@ -32,6 +32,7 @@ type SendEmailConfig struct {
 	To           string
 	ReportName   string
 	Types        []string
+	Params       map[string]map[string]string
 	DryRun       bool
 	SMTPUsername string
 	SMTPPassword string
@@ -43,7 +44,7 @@ var emailCmd = &cobra.Command{
 	Use:   "email <address> <analysis_name...> [date] [date]",
 	Short: "Sends an email report",
 	Long: `Emails history to the specified user.
-  <analysis_name> is one or more of: top-artists, top-albums, new-artists, new-albums.
+  <analysis_name> is one or more of: top-artists, top-albums, new-artists, new-albums, forgotten, top-n, taste-report.
   Optional date arguments can be provided at the end (e.g. '2023-01' or '2023-01 2023-06').
   If no dates are provided, defaults to the previous month.`,
 	Args: cobra.MinimumNArgs(2),
@@ -92,6 +93,20 @@ var emailCmd = &cobra.Command{
 			end = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
 		}
 
+		params, _ := cmd.Flags().GetStringToString("params")
+		structuredParams := make(map[string]map[string]string)
+		for k, v := range params {
+			pMap := make(map[string]string)
+			pairs := strings.Split(v, ",")
+			for _, pair := range pairs {
+				kv := strings.SplitN(pair, "=", 2)
+				if len(kv) == 2 {
+					pMap[kv[0]] = kv[1]
+				}
+			}
+			structuredParams[k] = pMap
+		}
+
 		config := SendEmailConfig{
 			DbPath:       viper.GetString("database"),
 			User:         viper.GetString("user"),
@@ -99,6 +114,7 @@ var emailCmd = &cobra.Command{
 			To:           to,
 			ReportName:   viper.GetString("name"),
 			Types:        analysisTypes,
+			Params:       structuredParams,
 			DryRun:       viper.GetBool("dryRun"),
 			SMTPUsername: viper.GetString("smtp_username"),
 			SMTPPassword: viper.GetString("smtp_password"),
@@ -119,6 +135,8 @@ func init() {
 	var dryRun bool
 	emailCmd.Flags().BoolVarP(&dryRun, "dry_run", "n", false, "When true, just print instead of emailing")
 	viper.BindPFlag("dryRun", emailCmd.Flags().Lookup("dry_run"))
+
+	emailCmd.Flags().StringToString("params", nil, "Parameters for reports (e.g. --params top-n=n=20)")
 }
 
 func sendEmail(config SendEmailConfig) error {
@@ -128,6 +146,18 @@ func sendEmail(config SendEmailConfig) error {
 		if err != nil {
 			return fmt.Errorf("Invalid analysis_name: %s", actionName)
 		}
+		
+		if config.Params != nil {
+			if params, ok := config.Params[actionName]; ok {
+				if configurable, ok := action.(Configurable); ok {
+					err := configurable.Configure(params)
+					if err != nil {
+						return fmt.Errorf("configuring %s: %w", actionName, err)
+					}
+				}
+			}
+		}
+
 		actions = append(actions, action)
 	}
 
@@ -200,7 +230,9 @@ table, th, td {
 			return "", "", fmt.Errorf("getting results for %s: %w", action.GetName(), err)
 		}
 
-		if len(analysis.results) <= 1 {
+		if analysis.BodyOverride != "" {
+			out += analysis.BodyOverride
+		} else if len(analysis.results) <= 1 {
 			// No listens found
 			out += "<div>No listens found.</div>\n"
 		} else {
@@ -243,11 +275,15 @@ table, th, td {
 }
 
 func getActionFromName(actionName string) (Analyser, error) {
+	// Recreating map every time but it's fine. Pointers required for Configure.
 	actionMap := map[string]Analyser{
-		"top-artists": TopArtistsAnalyzer{}.SetConfig(AnalyserConfig{20, 15}),
-		"top-albums":  TopAlbumsAnalyzer{}.SetConfig(AnalyserConfig{20, 15}),
-		"new-artists": NewArtistsAnalyzer{}.SetConfig(AnalyserConfig{0, 5}),
-		"new-albums":  NewAlbumsAnalyzer{}.SetConfig(AnalyserConfig{0, 5}),
+		"top-artists":  &TopArtistsAnalyzer{Config: AnalyserConfig{20, 15}},
+		"top-albums":   &TopAlbumsAnalyzer{Config: AnalyserConfig{20, 15}},
+		"new-artists":  &NewArtistsAnalyzer{Config: AnalyserConfig{0, 5}},
+		"new-albums":   &NewAlbumsAnalyzer{Config: AnalyserConfig{0, 5}},
+		"forgotten":    &ForgottenAnalyzer{},
+		"top-n":        &TopNAnalyzer{},
+		"taste-report": &TasteReportAnalyzer{},
 	}
 
 	action, ok := actionMap[actionName]

@@ -57,12 +57,30 @@ type NewAlbumsAnalyzer struct {
 	Config AnalyserConfig
 }
 
-func (t NewAlbumsAnalyzer) SetConfig(config AnalyserConfig) NewAlbumsAnalyzer {
+func (t *NewAlbumsAnalyzer) SetConfig(config AnalyserConfig) *NewAlbumsAnalyzer {
 	t.Config = config
 	return t
 }
 
-func (t NewAlbumsAnalyzer) GetName() string {
+func (t *NewAlbumsAnalyzer) Configure(params map[string]string) error {
+	if val, ok := params["n"]; ok {
+		n, err := strconv.Atoi(val)
+		if err != nil {
+			return fmt.Errorf("invalid value for 'n': %v", err)
+		}
+		t.Config.NumToReturn = n
+	}
+	if val, ok := params["min"]; ok {
+		min, err := strconv.ParseInt(val, 10, 64)
+		if err != nil {
+			return fmt.Errorf("invalid value for 'min': %v", err)
+		}
+		t.Config.FilterThreshold = min
+	}
+	return nil
+}
+
+func (t *NewAlbumsAnalyzer) GetName() string {
 	return "New albums"
 }
 
@@ -76,7 +94,8 @@ func printNewAlbums(dbPath string, numToReturn int, args []string) error {
 	start, end, err := parseDateRangeFromArgs(args)
 
 	config := AnalyserConfig{numToReturn, 0}
-	out, err := NewAlbumsAnalyzer{}.SetConfig(config).GetResults(dbPath, viper.GetString("user"), start, end)
+	analyzer := &NewAlbumsAnalyzer{}
+	out, err := analyzer.SetConfig(config).GetResults(dbPath, viper.GetString("user"), start, end)
 	if err != nil {
 		return err
 	}
@@ -84,7 +103,7 @@ func printNewAlbums(dbPath string, numToReturn int, args []string) error {
 	return nil
 }
 
-func (t NewAlbumsAnalyzer) GetResults(dbPath string, user string, start time.Time, end time.Time) (analysis Analysis, err error) {
+func (t *NewAlbumsAnalyzer) GetResults(dbPath string, user string, start time.Time, end time.Time) (analysis Analysis, err error) {
 	db, err := openDb(dbPath)
 	if err != nil {
 		err = fmt.Errorf("printNewAlbums: %w", err)

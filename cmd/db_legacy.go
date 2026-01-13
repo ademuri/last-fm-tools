@@ -52,6 +52,18 @@ func ensureSchema(db *sql.DB) error {
 		}
 	}
 
+	// Report.params
+	exists, err = columnExists(db, "Report", "params")
+	if err != nil {
+		return fmt.Errorf("checking if Report.params exists: %w", err)
+	}
+	if !exists {
+		_, err := db.Exec("ALTER TABLE Report ADD COLUMN params TEXT")
+		if err != nil {
+			return fmt.Errorf("adding params to Report: %w", err)
+		}
+	}
+
 	return nil
 }
 

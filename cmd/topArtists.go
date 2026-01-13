@@ -51,7 +51,8 @@ func printTopArtists(dbPath string, numToReturn int, args []string) error {
 	start, end, err := parseDateRangeFromArgs(args)
 
 	config := AnalyserConfig{numToReturn, 0}
-	out, err := TopArtistsAnalyzer{}.SetConfig(config).GetResults(dbPath, viper.GetString("user"), start, end)
+	analyzer := &TopArtistsAnalyzer{}
+	out, err := analyzer.SetConfig(config).GetResults(dbPath, viper.GetString("user"), start, end)
 	if err != nil {
 		return err
 	}
@@ -63,16 +64,34 @@ type TopArtistsAnalyzer struct {
 	Config AnalyserConfig
 }
 
-func (t TopArtistsAnalyzer) SetConfig(config AnalyserConfig) TopArtistsAnalyzer {
+func (t *TopArtistsAnalyzer) SetConfig(config AnalyserConfig) *TopArtistsAnalyzer {
 	t.Config = config
 	return t
 }
 
-func (t TopArtistsAnalyzer) GetName() string {
+func (t *TopArtistsAnalyzer) Configure(params map[string]string) error {
+	if val, ok := params["n"]; ok {
+		n, err := strconv.Atoi(val)
+		if err != nil {
+			return fmt.Errorf("invalid value for 'n': %v", err)
+		}
+		t.Config.NumToReturn = n
+	}
+	if val, ok := params["min"]; ok {
+		min, err := strconv.ParseInt(val, 10, 64)
+		if err != nil {
+			return fmt.Errorf("invalid value for 'min': %v", err)
+		}
+		t.Config.FilterThreshold = min
+	}
+	return nil
+}
+
+func (t *TopArtistsAnalyzer) GetName() string {
 	return "Top artists"
 }
 
-func (t TopArtistsAnalyzer) GetResults(dbPath string, user string, start time.Time, end time.Time) (analysis Analysis, err error) {
+func (t *TopArtistsAnalyzer) GetResults(dbPath string, user string, start time.Time, end time.Time) (analysis Analysis, err error) {
 	db, err := store.New(dbPath)
 	if err != nil {
 		err = fmt.Errorf("printTopArtists: %w", err)

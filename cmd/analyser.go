@@ -24,8 +24,9 @@ import (
 )
 
 type Analysis struct {
-	results [][]string
-	summary string
+	results      [][]string
+	summary      string
+	BodyOverride string
 }
 
 type AnalyserConfig struct {
@@ -40,6 +41,10 @@ type Analyser interface {
 	GetResults(dbPath string, user string, start time.Time, end time.Time) (Analysis, error)
 
 	GetName() string
+}
+
+type Configurable interface {
+	Configure(params map[string]string) error
 }
 
 func (a Analysis) String() string {

@@ -58,7 +58,8 @@ func printNewArtists(dbPath string, numToReturn int, args []string) error {
 	start, end, err := parseDateRangeFromArgs(args)
 
 	config := AnalyserConfig{numToReturn, 0}
-	out, err := NewArtistsAnalyzer{}.SetConfig(config).GetResults(dbPath, viper.GetString("user"), start, end)
+	analyzer := &NewArtistsAnalyzer{}
+	out, err := analyzer.SetConfig(config).GetResults(dbPath, viper.GetString("user"), start, end)
 	if err != nil {
 		return err
 	}
@@ -70,16 +71,34 @@ type NewArtistsAnalyzer struct {
 	Config AnalyserConfig
 }
 
-func (t NewArtistsAnalyzer) SetConfig(config AnalyserConfig) NewArtistsAnalyzer {
+func (t *NewArtistsAnalyzer) SetConfig(config AnalyserConfig) *NewArtistsAnalyzer {
 	t.Config = config
 	return t
 }
 
-func (t NewArtistsAnalyzer) GetName() string {
+func (t *NewArtistsAnalyzer) Configure(params map[string]string) error {
+	if val, ok := params["n"]; ok {
+		n, err := strconv.Atoi(val)
+		if err != nil {
+			return fmt.Errorf("invalid value for 'n': %v", err)
+		}
+		t.Config.NumToReturn = n
+	}
+	if val, ok := params["min"]; ok {
+		min, err := strconv.ParseInt(val, 10, 64)
+		if err != nil {
+			return fmt.Errorf("invalid value for 'min': %v", err)
+		}
+		t.Config.FilterThreshold = min
+	}
+	return nil
+}
+
+func (t *NewArtistsAnalyzer) GetName() string {
 	return "New artists"
 }
 
-func (t NewArtistsAnalyzer) GetResults(dbPath string, user string, start time.Time, end time.Time) (analysis Analysis, err error) {
+func (t *NewArtistsAnalyzer) GetResults(dbPath string, user string, start time.Time, end time.Time) (analysis Analysis, err error) {
 	db, err := openDb(dbPath)
 	if err != nil {
 		err = fmt.Errorf("printNewArtists: %w", err)

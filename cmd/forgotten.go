@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/ademuri/last-fm-tools/internal/analysis"
@@ -14,10 +15,10 @@ import (
 )
 
 var (
-	minArtistScrobbles int
-	minAlbumScrobbles  int
-	resultsPerBand     int
-	sortBy             string
+	minArtistScrobbles   int
+	minAlbumScrobbles    int
+	resultsPerBand       int
+	sortBy               string
 	lastListenAfterStr   string
 	lastListenBeforeStr  string
 	firstListenAfterStr  string
@@ -50,14 +51,158 @@ func init() {
 	forgottenCmd.Flags().StringVar(&firstListenBeforeStr, "first_listen_before", "", "Only include entities with first listen before this date (YYYY-MM-DD)")
 }
 
-func printForgotten(dbPath string) error {
+type ForgottenAnalyzer struct {
+	Config analysis.ForgottenConfig
+}
+
+func (f *ForgottenAnalyzer) Configure(params map[string]string) error {
+	// Defaults
+	f.Config.MinArtistScrobbles = 10
+	f.Config.MinAlbumScrobbles = 5
+	f.Config.ResultsPerBand = 10
+	f.Config.SortBy = "dormancy"
+	f.Config.LastListenBefore = time.Now().AddDate(0, 0, -90)
+	f.Config.LastListenAfter = time.Unix(0, 0)
+	f.Config.FirstListenBefore = time.Now()
+	f.Config.FirstListenAfter = time.Unix(0, 0)
+
+	if val, ok := params["min-artist"]; ok {
+		v, err := strconv.Atoi(val)
+		if err != nil {
+			return fmt.Errorf("invalid min-artist: %w", err)
+		}
+		f.Config.MinArtistScrobbles = v
+	}
+	if val, ok := params["min-album"]; ok {
+		v, err := strconv.Atoi(val)
+		if err != nil {
+			return fmt.Errorf("invalid min-album: %w", err)
+		}
+		f.Config.MinAlbumScrobbles = v
+	}
+	if val, ok := params["results"]; ok {
+		v, err := strconv.Atoi(val)
+		if err != nil {
+			return fmt.Errorf("invalid results: %w", err)
+		}
+		f.Config.ResultsPerBand = v
+	}
+	if val, ok := params["sort"]; ok {
+		f.Config.SortBy = val
+	}
+	if val, ok := params["last_listen_before"]; ok {
+		pd, err := parseSingleDatestring(val)
+		if err != nil {
+			return fmt.Errorf("invalid last_listen_before: %w", err)
+		}
+		f.Config.LastListenBefore = pd.Date
+	}
+	if val, ok := params["last_listen_after"]; ok {
+		pd, err := parseSingleDatestring(val)
+		if err != nil {
+			return fmt.Errorf("invalid last_listen_after: %w", err)
+		}
+		f.Config.LastListenAfter = pd.Date
+	}
+	if val, ok := params["first_listen_before"]; ok {
+		pd, err := parseSingleDatestring(val)
+		if err != nil {
+			return fmt.Errorf("invalid first_listen_before: %w", err)
+		}
+		f.Config.FirstListenBefore = pd.Date
+	}
+	if val, ok := params["first_listen_after"]; ok {
+		pd, err := parseSingleDatestring(val)
+		if err != nil {
+			return fmt.Errorf("invalid first_listen_after: %w", err)
+		}
+		f.Config.FirstListenAfter = pd.Date
+	}
+	return nil
+}
+
+func (f *ForgottenAnalyzer) GetName() string {
+	return "Forgotten"
+}
+
+func (f *ForgottenAnalyzer) GetResults(dbPath string, user string, start time.Time, end time.Time) (Analysis, error) {
+	var a Analysis
 	db, err := store.New(dbPath)
 	if err != nil {
-		return fmt.Errorf("opening database: %w", err)
+		return a, fmt.Errorf("opening database: %w", err)
 	}
 	defer db.Close()
 
-	// Determine time range
+	// Use config from struct, but ensure defaults if not set?
+	// Configure sets defaults if called. If not called, we might have zero values.
+	// But CLI usage calls SetConfig manually or we construct it.
+	// We'll assume Config is set or zero values are acceptable (they are mostly 0 except dates).
+	// But LastListenBefore default is 90d.
+	if f.Config.LastListenBefore.IsZero() {
+		f.Config.LastListenBefore = time.Now().AddDate(0, 0, -90)
+	}
+
+	artists, err := analysis.GetForgottenArtists(db, user, f.Config, time.Now())
+	if err != nil {
+		return a, err
+	}
+
+	albums, err := analysis.GetForgottenAlbums(db, user, f.Config, time.Now())
+	if err != nil {
+		return a, err
+	}
+
+	var sb strings.Builder
+	sb.WriteString("<h3>Forgotten Artists</h3>")
+	sb.WriteString(formatArtistBandHTML(artists, analysis.BandObsession))
+	sb.WriteString(formatArtistBandHTML(artists, analysis.BandStrong))
+	sb.WriteString(formatArtistBandHTML(artists, analysis.BandModerate))
+
+	sb.WriteString("<h3>Forgotten Albums</h3>")
+	sb.WriteString(formatAlbumBandHTML(albums, analysis.BandObsession))
+	sb.WriteString(formatAlbumBandHTML(albums, analysis.BandStrong))
+	sb.WriteString(formatAlbumBandHTML(albums, analysis.BandModerate))
+
+	a.BodyOverride = sb.String()
+	return a, nil
+}
+
+func formatArtistBandHTML(results map[string][]analysis.ForgottenArtist, band string) string {
+	items, ok := results[band]
+	if !ok || len(items) == 0 {
+		return ""
+	}
+
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("<h4>%s Interest (%d+ scrobbles)</h4>", band, analysis.GetThreshold(band, true)))
+	sb.WriteString("<table><thead><tr><th>Artist</th><th>Scrobbles</th><th>Last Listen</th></tr></thead><tbody>")
+	for _, a := range items {
+		sb.WriteString(fmt.Sprintf("<tr><td>%s</td><td>%d</td><td>%s</td></tr>",
+			a.Artist, a.TotalScrobbles, a.LastListen.Format("2006-01-02")))
+	}
+	sb.WriteString("</tbody></table>")
+	return sb.String()
+}
+
+func formatAlbumBandHTML(results map[string][]analysis.ForgottenAlbum, band string) string {
+	items, ok := results[band]
+	if !ok || len(items) == 0 {
+		return ""
+	}
+
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("<h4>%s Interest (%d+ scrobbles)</h4>", band, analysis.GetThreshold(band, false)))
+	sb.WriteString("<table><thead><tr><th>Artist</th><th>Album</th><th>Scrobbles</th><th>Last Listen</th></tr></thead><tbody>")
+	for _, a := range items {
+		sb.WriteString(fmt.Sprintf("<tr><td>%s</td><td>%s</td><td>%d</td><td>%s</td></tr>",
+			a.Artist, a.Album, a.TotalScrobbles, a.LastListen.Format("2006-01-02")))
+	}
+	sb.WriteString("</tbody></table>")
+	return sb.String()
+}
+
+func printForgotten(dbPath string) error {
+	// Determine time range from global flags
 	var lastListenBefore time.Time
 	if lastListenBeforeStr != "" {
 		pd, err := parseSingleDatestring(lastListenBeforeStr)
@@ -66,7 +211,6 @@ func printForgotten(dbPath string) error {
 		}
 		lastListenBefore = pd.Date
 	} else {
-		// Should not happen due to default value, but keep as safety
 		lastListenBefore = time.Now().AddDate(0, 0, -90)
 	}
 
@@ -78,7 +222,6 @@ func printForgotten(dbPath string) error {
 		}
 		lastListenAfter = pd.Date
 	} else {
-		// Default to 0 (beginning of time)
 		lastListenAfter = time.Unix(0, 0)
 	}
 
@@ -114,6 +257,12 @@ func printForgotten(dbPath string) error {
 		ResultsPerBand:     resultsPerBand,
 		SortBy:             sortBy,
 	}
+
+	db, err := store.New(dbPath)
+	if err != nil {
+		return fmt.Errorf("opening database: %w", err)
+	}
+	defer db.Close()
 
 	user := viper.GetString("user")
 
