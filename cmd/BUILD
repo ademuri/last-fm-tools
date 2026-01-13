@@ -46,6 +46,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "addReport_test.go",
+        "checkSources_test.go",
         "date_test.go",
         "deleteReport_test.go",
         "email_test.go",

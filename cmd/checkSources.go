@@ -160,53 +160,72 @@ func (c *CheckSourcesAnalyzer) GetResults(dbPath string, user string, _ time.Tim
 	}
 	sort.Strings(keys)
 
-	// Calculate streaks
-	workStreak := 0
-	otherStreak := 0
-
-	// Other Streak
-	for i := len(keys) - 1; i >= 0; i-- {
-		if counts[keys[i]].OtherHours == 0 {
-			otherStreak++
-		} else {
-			break
+		// Calculate streaks
+		workStreak := 0
+		otherStreak := 0
+		weekendStreak := 0
+	
+		// Other Streak
+		for i := len(keys) - 1; i >= 0; i-- {
+			if counts[keys[i]].OtherHours == 0 {
+				otherStreak++
+			} else {
+				break
+			}
 		}
-	}
-
-	// Work Streak (skip weekends)
-	for i := len(keys) - 1; i >= 0; i-- {
-		entry := counts[keys[i]]
-		isWeekend := entry.Date.Weekday() == time.Saturday || entry.Date.Weekday() == time.Sunday
-		if isWeekend {
-			continue
+	
+		// Work Streak (skip weekends)
+		for i := len(keys) - 1; i >= 0; i-- {
+			entry := counts[keys[i]]
+			isWeekend := entry.Date.Weekday() == time.Saturday || entry.Date.Weekday() == time.Sunday
+			if isWeekend {
+				continue
+			}
+			if entry.WorkHours == 0 {
+				workStreak++
+			} else {
+				break
+			}
 		}
-		if entry.WorkHours == 0 {
-			workStreak++
-		} else {
-			break
+	
+		// Weekend Streak (skip weekdays)
+		for i := len(keys) - 1; i >= 0; i-- {
+			entry := counts[keys[i]]
+			isWeekend := entry.Date.Weekday() == time.Saturday || entry.Date.Weekday() == time.Sunday
+			if !isWeekend {
+				continue
+			}
+			// On weekends, all hours are "OtherHours" (WorkHours is 0 by definition in our loop)
+			// But let's check total listens just to be safe (OtherHours + WorkHours)
+			if entry.OtherHours+entry.WorkHours == 0 {
+				weekendStreak++
+			} else {
+				break
+			}
 		}
-	}
-
-	if workStreak <= 3 && otherStreak <= 3 {
-		return Analysis{}, ErrSkipReport
-	}
-
-	// Generate Output
-	var buf bytes.Buffer
-
-	fmt.Fprintf(&buf, "Scrobble Check for user: %s (Timezone: %s)\n", user, loc.String())
-	fmt.Fprintln(&buf, "Work Hours: Mon-Fri, 09:00 - 17:00")
-	fmt.Fprintln(&buf)
-
-	if workStreak > 3 {
-		fmt.Fprintf(&buf, "⚠️  Potential Work Scrobbler Failure: No listens during work hours for the last %d working days.\n", workStreak)
-	}
-	if otherStreak > 3 {
-		fmt.Fprintf(&buf, "⚠️  Potential Mobile/Home Scrobbler Failure: No listens during off-hours for the last %d days.\n", otherStreak)
-	}
-	fmt.Fprintln(&buf)
-
-	w := tabwriter.NewWriter(&buf, 0, 0, 3, ' ', 0)
+	
+		if workStreak <= 3 && otherStreak <= 3 && weekendStreak < 4 {
+			return Analysis{}, ErrSkipReport
+		}
+	
+		// Generate Output
+		var buf bytes.Buffer
+		
+		fmt.Fprintf(&buf, "Scrobble Check for user: %s (Timezone: %s)\n", user, loc.String())
+		fmt.Fprintln(&buf, "Work Hours: Mon-Fri, 09:00 - 17:00")
+		fmt.Fprintln(&buf)
+	
+		if workStreak > 3 {
+			fmt.Fprintf(&buf, "⚠️  Potential Work Scrobbler Failure: No listens during work hours for the last %d working days.\n", workStreak)
+		}
+		if weekendStreak >= 4 {
+			fmt.Fprintf(&buf, "⚠️  Potential Weekend Scrobbler Failure: No listens during weekends for the last %d weekend days.\n", weekendStreak)
+		}
+		if otherStreak > 3 {
+			fmt.Fprintf(&buf, "⚠️  Potential Mobile/Home Scrobbler Failure: No listens during off-hours for the last %d days.\n", otherStreak)
+		}
+		fmt.Fprintln(&buf)
+		w := tabwriter.NewWriter(&buf, 0, 0, 3, ' ', 0)
 	fmt.Fprintln(w, "Date\tDay\tWork Hours (9-5)\tOther Hours")
 
 	for _, dateStr := range keys {
