@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"net/smtp"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -32,7 +33,7 @@ type SendEmailConfig struct {
 	To           string
 	ReportName   string
 	Types        []string
-	Params       map[string]map[string]string
+	Params       []map[string]string
 	DryRun       bool
 	SMTPUsername string
 	SMTPPassword string
@@ -93,18 +94,26 @@ var emailCmd = &cobra.Command{
 			end = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
 		}
 
-		params, _ := cmd.Flags().GetStringToString("params")
-		structuredParams := make(map[string]map[string]string)
-		for k, v := range params {
+		params, _ := cmd.Flags().GetStringArray("params")
+		
+		if len(params) > 0 && len(params) != len(analysisTypes) {
+			fmt.Printf("Error: Number of --params flags (%d) must match number of reports (%d), or be 0.\n", len(params), len(analysisTypes))
+			os.Exit(1)
+		}
+
+		structuredParams := make([]map[string]string, len(analysisTypes))
+		for i, v := range params {
 			pMap := make(map[string]string)
-			pairs := strings.Split(v, ",")
-			for _, pair := range pairs {
-				kv := strings.SplitN(pair, "=", 2)
-				if len(kv) == 2 {
-					pMap[kv[0]] = kv[1]
+			if v != "" {
+				pairs := strings.Split(v, ",")
+				for _, pair := range pairs {
+					kv := strings.SplitN(pair, "=", 2)
+					if len(kv) == 2 {
+						pMap[kv[0]] = kv[1]
+					}
 				}
 			}
-			structuredParams[k] = pMap
+			structuredParams[i] = pMap
 		}
 
 		config := SendEmailConfig{
@@ -136,23 +145,24 @@ func init() {
 	emailCmd.Flags().BoolVarP(&dryRun, "dry_run", "n", false, "When true, just print instead of emailing")
 	viper.BindPFlag("dryRun", emailCmd.Flags().Lookup("dry_run"))
 
-	emailCmd.Flags().StringToString("params", nil, "Parameters for reports (e.g. --params top-n=n=20)")
+	emailCmd.Flags().StringArray("params", nil, "Parameters for reports, matched by index (e.g. --params 'n=20')")
 }
 
 func sendEmail(config SendEmailConfig) error {
 	actions := make([]Analyser, 0)
-	for _, actionName := range config.Types {
+	for i, actionName := range config.Types {
 		action, err := getActionFromName(actionName)
 		if err != nil {
 			return fmt.Errorf("Invalid analysis_name: %s", actionName)
 		}
-		
-		if config.Params != nil {
-			if params, ok := config.Params[actionName]; ok {
+
+		if config.Params != nil && i < len(config.Params) {
+			params := config.Params[i]
+			if len(params) > 0 {
 				if configurable, ok := action.(Configurable); ok {
 					err := configurable.Configure(params)
 					if err != nil {
-						return fmt.Errorf("configuring %s: %w", actionName, err)
+						return fmt.Errorf("configuring %s (index %d): %w", actionName, i, err)
 					}
 				}
 			}
@@ -160,7 +170,6 @@ func sendEmail(config SendEmailConfig) error {
 
 		actions = append(actions, action)
 	}
-
 	subject, out, err := generateEmailContent(config, actions)
 	if err != nil {
 		return err

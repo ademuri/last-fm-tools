@@ -113,7 +113,7 @@ func sendReports(config SendReportsConfig) error {
 		}
 
 		if params.Valid && params.String != "" {
-			var p map[string]map[string]string
+			var p []map[string]string
 			if err := json.Unmarshal([]byte(params.String), &p); err != nil {
 				fmt.Printf("Warning: failed to unmarshal params for report %s: %v\n", emailConfig.ReportName, err)
 			} else {

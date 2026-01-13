@@ -63,9 +63,13 @@ $ last-fm-tools email user@example.com top-artists top-albums 2023-01
 
 Analysis types: `top-artists`, `top-albums`, `new-artists`, `new-albums`, `forgotten`, `top-n`, `taste-report`.
 
-You can pass parameters to specific reports using the `--params` flag:
+You can pass parameters to specific reports using the `--params` flag. Parameters are matched to reports by their order:
 ```bash
-$ last-fm-tools email user@example.com top-n forgotten --params "top-n=artists=20,albums=10" --params "forgotten=min-artist=20"
+$ last-fm-tools email user@example.com top-n forgotten --params "artists=20,albums=10" --params "min-artist=20"
+```
+To skip parameters for a report in the middle, use an empty string:
+```bash
+$ last-fm-tools email user@example.com top-n top-artists forgotten --params "artists=20" --params "" --params "min-artist=20"
 ```
 
 ## add-report
@@ -73,7 +77,7 @@ $ last-fm-tools email user@example.com top-n forgotten --params "top-n=artists=2
 Adds a report configuration to the database to be sent periodically via `send-reports`.
 
 ```bash
-$ last-fm-tools add-report --name="Monthly Summary" --dest=user@example.com --run_day=1 top-n taste-report --params "top-n=artists=20"
+$ last-fm-tools add-report --name="Monthly Summary" --dest=user@example.com --run_day=1 top-n taste-report --params "artists=20"
 ```
 
 ## list-reports

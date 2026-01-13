@@ -32,7 +32,13 @@ var addReportCmd = &cobra.Command{
 	Long:  ``,
 	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		params, _ := cmd.Flags().GetStringToString("params")
+		params, _ := cmd.Flags().GetStringArray("params")
+		
+		if len(params) > 0 && len(params) != len(args) {
+			fmt.Printf("Error: Number of --params flags (%d) must match number of reports (%d), or be 0.\n", len(params), len(args))
+			os.Exit(1)
+		}
+
 		err := addReport(viper.GetString("database"), viper.GetString("name"), viper.GetString("user"), viper.GetString("dest"), viper.GetInt("run_day"), args, params)
 		if err != nil {
 			fmt.Println(err)
@@ -62,10 +68,10 @@ func init() {
 	addReportCmd.MarkFlagRequired("runDay")
 	viper.BindPFlag("run_day", addReportCmd.Flags().Lookup("run_day"))
 	
-	addReportCmd.Flags().StringToString("params", nil, "Parameters for reports (e.g. --params top-n=n=20)")
+	addReportCmd.Flags().StringArray("params", nil, "Parameters for reports, matched by index (e.g. --params 'n=20')")
 }
 
-func addReport(dbPath string, name string, user string, to string, runDay int, types []string, params map[string]string) error {
+func addReport(dbPath string, name string, user string, to string, runDay int, types []string, params []string) error {
 	if runDay < 1 || runDay > 31 {
 		return fmt.Errorf("run_day out of range: %d", runDay)
 	}
@@ -90,27 +96,20 @@ func addReport(dbPath string, name string, user string, to string, runDay int, t
 		return nil
 	}
 	
-	// Convert params map to JSON
-	// The input params is map[string]string where key is report name and value is params string.
-	// We need to parse the params string into map[string]string for the storage if we want structured access, 
-	// OR just store the raw string and parse later? 
-	// Better to store structured: map[string]map[string]string
-	
-	structuredParams := make(map[string]map[string]string)
-	for k, v := range params {
-		// v is like "n=20,min=5" (comma separated? or custom format?)
-		// StringToString uses comma to separate key=value pairs for the outer map.
-		// So "top-n=n=20,min=5" -> key: "top-n", value: "n=20,min=5"
-		// We'll treat the value as k=v pairs comma separated.
+	// Convert params slice to JSON list of maps
+	structuredParams := make([]map[string]string, len(types))
+	for i := range types {
 		pMap := make(map[string]string)
-		pairs := strings.Split(v, ",")
-		for _, pair := range pairs {
-			kv := strings.SplitN(pair, "=", 2)
-			if len(kv) == 2 {
-				pMap[kv[0]] = kv[1]
+		if i < len(params) && params[i] != "" {
+			pairs := strings.Split(params[i], ",")
+			for _, pair := range pairs {
+				kv := strings.SplitN(pair, "=", 2)
+				if len(kv) == 2 {
+					pMap[kv[0]] = kv[1]
+				}
 			}
 		}
-		structuredParams[k] = pMap
+		structuredParams[i] = pMap
 	}
 
 	paramsJSON, err := json.Marshal(structuredParams)
