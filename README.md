@@ -67,6 +67,9 @@ $ last-fm-tools check-sources --user=foo --days=14
 Options:
 - `--days`: Number of days to check back (default: 14).
 - `--history`: Simulate the check for the past N days to see if alerts would have triggered.
+- `--work-streak`: Threshold for consecutive silent working days to trigger a work scrobbler alert (default: 3).
+- `--other-streak`: Threshold for consecutive silent days (off-hours) to trigger a general/mobile scrobbler alert (default: 3).
+- `--weekend-streak`: Threshold for consecutive silent weekend days to trigger a weekend scrobbler alert (default: 4).
 
 ## email
 
@@ -98,13 +101,14 @@ $ last-fm-tools add-report --name="Monthly Summary" --dest=user@example.com --ru
 To add a daily report (e.g., for `check-sources`), use `--run_day=0`. You can configure timezones and cool-off periods using `--params`.
 
 ```bash
-$ last-fm-tools add-report check-sources --name="Daily Check" --dest=user@example.com --run_day=0 --params "days=14,timezone=America/Los_Angeles,cool_off_days=1"
+$ last-fm-tools add-report check-sources --name="Daily Check" --dest=user@example.com --run_day=0 --params "days=14,timezone=America/Los_Angeles,cool_off_days=1,work_streak=3"
 ```
 
 Parameters for `check-sources`:
 - `days`: Lookback window size.
 - `timezone`: Timezone for determining work hours (e.g., "America/Los_Angeles").
 - `cool_off_days`: Minimum days to wait before sending another alert (default: 1).
+- `work_streak`, `other_streak`, `weekend_streak`: Sensitivity thresholds for alerts.
 
 ## list-reports
 

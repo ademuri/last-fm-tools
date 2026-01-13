@@ -16,13 +16,17 @@ import (
 )
 
 var daysToCheck int
+var historyDays int
+var workStreakThreshold int
+var otherStreakThreshold int
+var weekendStreakThreshold int
 
 var checkSourcesCmd = &cobra.Command{
 	Use:   "check-sources",
 	Short: "Checks for gaps in scrobbling activity",
 	Long:  `Analyzes scrobbles over a specified number of days (default 14) to detect potential failures in desktop (Work Hours) or mobile (Other Hours) scrobblers.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		err := checkSources(viper.GetString("database"), viper.GetString("user"), daysToCheck)
+		err := checkSources(viper.GetString("database"), viper.GetString("user"), daysToCheck, historyDays)
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)
@@ -33,15 +37,46 @@ var checkSourcesCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(checkSourcesCmd)
 	checkSourcesCmd.Flags().IntVarP(&daysToCheck, "days", "D", 14, "Number of days to check back")
+	checkSourcesCmd.Flags().IntVar(&historyDays, "history", 0, "Simulate check for the past N days")
+	checkSourcesCmd.Flags().IntVar(&workStreakThreshold, "work-streak", 3, "Threshold for work days silence")
+	checkSourcesCmd.Flags().IntVar(&otherStreakThreshold, "other-streak", 3, "Threshold for off-hours silence")
+	checkSourcesCmd.Flags().IntVar(&weekendStreakThreshold, "weekend-streak", 4, "Threshold for weekend days silence")
 }
 
-func checkSources(dbPath, user string, days int) error {
+func checkSources(dbPath, user string, days int, history int) error {
 	analyzer := &CheckSourcesAnalyzer{}
 	params := map[string]string{
-		"days": strconv.Itoa(days),
+		"days":           strconv.Itoa(days),
+		"work_streak":    strconv.Itoa(workStreakThreshold),
+		"other_streak":   strconv.Itoa(otherStreakThreshold),
+		"weekend_streak": strconv.Itoa(weekendStreakThreshold),
 	}
 	if err := analyzer.Configure(params); err != nil {
 		return err
+	}
+
+	if history > 0 {
+		fmt.Printf("Simulating checks for the past %d days...\n", history)
+		foundIssues := false
+		// Loop from past to present
+		for i := history; i >= 0; i-- {
+			simulatedDate := time.Now().AddDate(0, 0, -i)
+			res, err := analyzer.GetResults(dbPath, user, time.Time{}, simulatedDate)
+			if err == ErrSkipReport {
+				continue
+			}
+			if err != nil {
+				return err
+			}
+			foundIssues = true
+			fmt.Printf("--------------------------------------------------\n")
+			fmt.Printf("Date: %s\n", simulatedDate.Format("2006-01-02"))
+			fmt.Println(res.BodyOverride)
+		}
+		if !foundIssues {
+			fmt.Println("No issues would have been detected in the past.")
+		}
+		return nil
 	}
 
 	// Use dummy times for GetResults as it calculates its own window based on 'days'
@@ -59,8 +94,11 @@ func checkSources(dbPath, user string, days int) error {
 }
 
 type CheckSourcesAnalyzer struct {
-	Days     int
-	Timezone string
+	Days                   int
+	Timezone               string
+	WorkStreakThreshold    int
+	OtherStreakThreshold   int
+	WeekendStreakThreshold int
 }
 
 func (c *CheckSourcesAnalyzer) GetName() string {
@@ -81,10 +119,35 @@ func (c *CheckSourcesAnalyzer) Configure(params map[string]string) error {
 	if val, ok := params["timezone"]; ok {
 		c.Timezone = val
 	}
+
+	c.WorkStreakThreshold = 3
+	if val, ok := params["work_streak"]; ok {
+		d, err := strconv.Atoi(val)
+		if err == nil {
+			c.WorkStreakThreshold = d
+		}
+	}
+
+	c.OtherStreakThreshold = 3
+	if val, ok := params["other_streak"]; ok {
+		d, err := strconv.Atoi(val)
+		if err == nil {
+			c.OtherStreakThreshold = d
+		}
+	}
+
+	c.WeekendStreakThreshold = 4
+	if val, ok := params["weekend_streak"]; ok {
+		d, err := strconv.Atoi(val)
+		if err == nil {
+			c.WeekendStreakThreshold = d
+		}
+	}
+
 	return nil
 }
 
-func (c *CheckSourcesAnalyzer) GetResults(dbPath string, user string, _ time.Time, _ time.Time) (Analysis, error) {
+func (c *CheckSourcesAnalyzer) GetResults(dbPath string, user string, _ time.Time, endTime time.Time) (Analysis, error) {
 	db, err := store.New(dbPath)
 	if err != nil {
 		return Analysis{}, fmt.Errorf("opening database: %w", err)
@@ -103,6 +166,10 @@ func (c *CheckSourcesAnalyzer) GetResults(dbPath string, user string, _ time.Tim
 
 	// Analyze last N days
 	now := time.Now().In(loc)
+	if !endTime.IsZero() {
+		now = endTime.In(loc)
+	}
+	
 	// Start from N days ago at 00:00:00 local time
 	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
 	start := todayStart.AddDate(0, 0, -c.Days)
@@ -160,71 +227,71 @@ func (c *CheckSourcesAnalyzer) GetResults(dbPath string, user string, _ time.Tim
 	}
 	sort.Strings(keys)
 
-		// Calculate streaks
-		workStreak := 0
-		otherStreak := 0
-		weekendStreak := 0
+	// Calculate streaks
+	workStreak := 0
+	otherStreak := 0
+	weekendStreak := 0
+
+	// Other Streak
+	for i := len(keys) - 1; i >= 0; i-- {
+		if counts[keys[i]].OtherHours == 0 {
+			otherStreak++
+		} else {
+			break
+		}
+	}
+
+	// Work Streak (skip weekends)
+	for i := len(keys) - 1; i >= 0; i-- {
+		entry := counts[keys[i]]
+		isWeekend := entry.Date.Weekday() == time.Saturday || entry.Date.Weekday() == time.Sunday
+		if isWeekend {
+			continue
+		}
+		if entry.WorkHours == 0 {
+			workStreak++
+		} else {
+			break
+		}
+	}
+
+	// Weekend Streak (skip weekdays)
+	for i := len(keys) - 1; i >= 0; i-- {
+		entry := counts[keys[i]]
+		isWeekend := entry.Date.Weekday() == time.Saturday || entry.Date.Weekday() == time.Sunday
+		if !isWeekend {
+			continue
+		}
+		// On weekends, all hours are "OtherHours" (WorkHours is 0 by definition in our loop)
+		// But let's check total listens just to be safe (OtherHours + WorkHours)
+		if entry.OtherHours+entry.WorkHours == 0 {
+			weekendStreak++
+		} else {
+			break
+		}
+	}
+
+	if workStreak <= c.WorkStreakThreshold && otherStreak <= c.OtherStreakThreshold && weekendStreak < c.WeekendStreakThreshold {
+		return Analysis{}, ErrSkipReport
+	}
+
+	// Generate Output
+	var buf bytes.Buffer
 	
-		// Other Streak
-		for i := len(keys) - 1; i >= 0; i-- {
-			if counts[keys[i]].OtherHours == 0 {
-				otherStreak++
-			} else {
-				break
-			}
-		}
-	
-		// Work Streak (skip weekends)
-		for i := len(keys) - 1; i >= 0; i-- {
-			entry := counts[keys[i]]
-			isWeekend := entry.Date.Weekday() == time.Saturday || entry.Date.Weekday() == time.Sunday
-			if isWeekend {
-				continue
-			}
-			if entry.WorkHours == 0 {
-				workStreak++
-			} else {
-				break
-			}
-		}
-	
-		// Weekend Streak (skip weekdays)
-		for i := len(keys) - 1; i >= 0; i-- {
-			entry := counts[keys[i]]
-			isWeekend := entry.Date.Weekday() == time.Saturday || entry.Date.Weekday() == time.Sunday
-			if !isWeekend {
-				continue
-			}
-			// On weekends, all hours are "OtherHours" (WorkHours is 0 by definition in our loop)
-			// But let's check total listens just to be safe (OtherHours + WorkHours)
-			if entry.OtherHours+entry.WorkHours == 0 {
-				weekendStreak++
-			} else {
-				break
-			}
-		}
-	
-		if workStreak <= 3 && otherStreak <= 3 && weekendStreak < 4 {
-			return Analysis{}, ErrSkipReport
-		}
-	
-		// Generate Output
-		var buf bytes.Buffer
-		
-		fmt.Fprintf(&buf, "Scrobble Check for user: %s (Timezone: %s)\n", user, loc.String())
-		fmt.Fprintln(&buf, "Work Hours: Mon-Fri, 09:00 - 17:00")
-		fmt.Fprintln(&buf)
-	
-		if workStreak > 3 {
-			fmt.Fprintf(&buf, "⚠️  Potential Work Scrobbler Failure: No listens during work hours for the last %d working days.\n", workStreak)
-		}
-		if weekendStreak >= 4 {
-			fmt.Fprintf(&buf, "⚠️  Potential Weekend Scrobbler Failure: No listens during weekends for the last %d weekend days.\n", weekendStreak)
-		}
-		if otherStreak > 3 {
-			fmt.Fprintf(&buf, "⚠️  Potential Mobile/Home Scrobbler Failure: No listens during off-hours for the last %d days.\n", otherStreak)
-		}
-		fmt.Fprintln(&buf)
+	fmt.Fprintf(&buf, "Scrobble Check for user: %s (Timezone: %s)\n", user, loc.String())
+	fmt.Fprintln(&buf, "Work Hours: Mon-Fri, 09:00 - 17:00")
+	fmt.Fprintln(&buf)
+
+	if workStreak > c.WorkStreakThreshold {
+		fmt.Fprintf(&buf, "⚠️  Potential Work Scrobbler Failure: No listens during work hours for the last %d working days.\n", workStreak)
+	}
+	if weekendStreak >= c.WeekendStreakThreshold {
+		fmt.Fprintf(&buf, "⚠️  Potential Weekend Scrobbler Failure: No listens during weekends for the last %d weekend days.\n", weekendStreak)
+	}
+	if otherStreak > c.OtherStreakThreshold {
+		fmt.Fprintf(&buf, "⚠️  Potential Mobile/Home Scrobbler Failure: No listens during off-hours for the last %d days.\n", otherStreak)
+	}
+	fmt.Fprintln(&buf)
 		w := tabwriter.NewWriter(&buf, 0, 0, 3, ' ', 0)
 	fmt.Fprintln(w, "Date\tDay\tWork Hours (9-5)\tOther Hours")
 
