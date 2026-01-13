@@ -141,6 +141,54 @@ func TestCheckSourcesAnalyzer_GetResults(t *testing.T) {
 			t.Errorf("High Threshold: Expected ErrSkipReport, got %v", err)
 		}
 	})
+	t.Run("Work Hours Configuration", func(t *testing.T) {
+		// Custom Window: 10:00 - 18:00.
+		// Default is 9-17.
+		
+		// Subtest A: Listen at 09:30 (Other Hours). Window (10-18) is silent. Expect Alert.
+		t.Run("Alert Triggered", func(t *testing.T) {
+			dbRaw, dbPath := createTestDb(t)
+			defer dbRaw.Close()
+			
+			for i := 0; i < 10; i++ {
+				d := time.Now().AddDate(0, 0, -i)
+				// Listen at 09:30.
+				// If default (9-17), this is WORK. Streak = 0. No Alert.
+				// If custom (10-18), this is OTHER. Work Streak = 10. Alert.
+				addListenForDB(t, dbPath, user, time.Date(d.Year(), d.Month(), d.Day(), 9, 30, 0, 0, time.Local))
+			}
+
+			analyzer := &CheckSourcesAnalyzer{}
+			analyzer.Configure(map[string]string{"days": "14", "work_hours": "10-18"})
+			
+			res, err := analyzer.GetResults(dbPath, user, time.Time{}, time.Time{})
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+			if !contains(res.BodyOverride, "Potential Work Scrobbler Failure") {
+				t.Errorf("Expected alert with custom hours, got none")
+			}
+		})
+
+		// Subtest B: Listen at 10:30 (Work Hours). Expect No Alert.
+		t.Run("Alert Suppressed", func(t *testing.T) {
+			dbRaw, dbPath := createTestDb(t)
+			defer dbRaw.Close()
+			
+			for i := 0; i < 10; i++ {
+				d := time.Now().AddDate(0, 0, -i)
+				addListenForDB(t, dbPath, user, time.Date(d.Year(), d.Month(), d.Day(), 10, 30, 0, 0, time.Local))
+			}
+
+			analyzer := &CheckSourcesAnalyzer{}
+			analyzer.Configure(map[string]string{"days": "14", "work_hours": "10-18"})
+			
+			_, err := analyzer.GetResults(dbPath, user, time.Time{}, time.Time{})
+			if err != ErrSkipReport {
+				t.Errorf("Expected ErrSkipReport, got %v", err)
+			}
+		})
+	})
 }
 
 func addListenForDB(t *testing.T, dbPath, user string, ts time.Time) {
