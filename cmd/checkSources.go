@@ -21,7 +21,6 @@ var (
 	workStreakThreshold    int
 	otherStreakThreshold   int
 	weekendStreakThreshold int
-	cooldownDays           int
 	timezone               string
 	workHours              string
 )
@@ -47,7 +46,6 @@ func init() {
 	checkSourcesCmd.Flags().IntVar(&workStreakThreshold, "work-streak", 3, "Threshold for work days silence")
 	checkSourcesCmd.Flags().IntVar(&otherStreakThreshold, "other-streak", 3, "Threshold for off-hours silence")
 	checkSourcesCmd.Flags().IntVar(&weekendStreakThreshold, "weekend-streak", 4, "Threshold for weekend days silence")
-	checkSourcesCmd.Flags().IntVar(&cooldownDays, "cooldown-days", 0, "Days to wait before repeating a warning")
 	checkSourcesCmd.Flags().StringVar(&timezone, "timezone", "", "Timezone for analysis (e.g. America/Los_Angeles)")
 	checkSourcesCmd.Flags().StringVar(&workHours, "work-hours", "09-17", "Work hours interval (start-end)")
 }
@@ -99,35 +97,6 @@ func checkSources(dbPath, user string, days int, history int) error {
 	}
 	if err != nil {
 		return err
-	}
-
-	// Check cooldown if enabled
-	if cooldownDays > 0 {
-		db, err := store.New(dbPath)
-		if err != nil {
-			return fmt.Errorf("opening db for cooldown check: %w", err)
-		}
-		// Defer close is handled, but we might want to close early.
-		// Let's use a function literal or just be careful.
-		// Since store.New opens a new connection, we should close it.
-		
-		lastRun, err := db.GetCommandLastRun(user, "check-sources")
-		if err != nil {
-			db.Close()
-			return fmt.Errorf("checking cooldown: %w", err)
-		}
-
-		if !lastRun.IsZero() && time.Since(lastRun) < time.Duration(cooldownDays)*24*time.Hour {
-			fmt.Printf("Warning suppressed due to cooldown (last sent: %s)\n", lastRun.Format("2006-01-02 15:04:05"))
-			db.Close()
-			return nil
-		}
-
-		// Update last run time
-		if err := db.SetCommandLastRun(user, "check-sources", time.Now()); err != nil {
-			fmt.Printf("Warning: Failed to update cooldown timestamp: %v\n", err)
-		}
-		db.Close()
 	}
 
 	fmt.Println(res.BodyOverride)

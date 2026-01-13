@@ -78,19 +78,21 @@ CREATE TABLE ArtistTag (
 );
 
 CREATE TABLE AlbumTag (
-  artist TEXT,
-  album TEXT,
-  tag TEXT,
-  count INTEGER,
-  FOREIGN KEY (artist) REFERENCES Artist(name),
-  FOREIGN KEY (album) REFERENCES Album(name),
-  FOREIGN KEY (tag) REFERENCES Tag(name),
-  PRIMARY KEY (artist, album, tag)
-);
 
-CREATE TABLE CommandHistory (
-  command_name TEXT,
-  user TEXT,
-  last_run DATETIME,
-  PRIMARY KEY (command_name, user)
+  artist TEXT,
+
+  album TEXT,
+
+  tag TEXT,
+
+  count INTEGER,
+
+  FOREIGN KEY (artist) REFERENCES Artist(name),
+
+  FOREIGN KEY (album) REFERENCES Album(name),
+
+  FOREIGN KEY (tag) REFERENCES Tag(name),
+
+  PRIMARY KEY (artist, album, tag)
+
 );

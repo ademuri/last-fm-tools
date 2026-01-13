@@ -3,7 +3,6 @@ package store
 import (
 	"database/sql"
 	"fmt"
-	"time"
 
 	"github.com/ademuri/last-fm-tools/internal/migration"
 	_ "github.com/mattn/go-sqlite3"
@@ -118,55 +117,6 @@ func ensureSchema(db *sql.DB) error {
 	// Album.tags_last_updated
 	if err := addColumnIfNotExists(db, "Album", "tags_last_updated", "DATETIME"); err != nil {
 		return err
-	}
-
-	// CommandHistory table
-	query := `CREATE TABLE CommandHistory (
-  command_name TEXT,
-  user TEXT,
-  last_run DATETIME,
-  PRIMARY KEY (command_name, user)
-)`
-	if err := createTableIfNotExists(db, "CommandHistory", query); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (s *Store) GetCommandLastRun(user, command string) (time.Time, error) {
-	row := s.db.QueryRow("SELECT last_run FROM CommandHistory WHERE user = ? AND command_name = ?", user, command)
-	var lastRun time.Time
-	err := row.Scan(&lastRun)
-	if err == sql.ErrNoRows {
-		return time.Time{}, nil // Never run before
-	}
-	if err != nil {
-		return time.Time{}, fmt.Errorf("getting last run: %w", err)
-	}
-	return lastRun, nil
-}
-
-func (s *Store) SetCommandLastRun(user, command string, t time.Time) error {
-	_, err := s.db.Exec(`INSERT OR REPLACE INTO CommandHistory (user, command_name, last_run) VALUES (?, ?, ?)`, user, command, t)
-	if err != nil {
-		return fmt.Errorf("setting last run: %w", err)
-	}
-	return nil
-}
-
-func createTableIfNotExists(db *sql.DB, tableName, schema string) error {
-	row := db.QueryRow("SELECT name FROM sqlite_master WHERE type='table' AND name = ?", tableName)
-	var name string
-	err := row.Scan(&name)
-	if err == sql.ErrNoRows {
-		if _, err := db.Exec(schema); err != nil {
-			return fmt.Errorf("creating table %s: %w", tableName, err)
-		}
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("checking table existence %s: %w", tableName, err)
 	}
 	return nil
 }
