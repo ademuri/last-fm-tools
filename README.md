@@ -53,6 +53,21 @@ Options:
 - `--first_listen_after`: Only include entities with first listen after this date. Supports absolute dates or relative durations.
 - `--first_listen_before`: Only include entities with first listen before this date. Supports absolute dates or relative durations.
 
+## check-sources
+
+Analyzes recent scrobbling activity to detect potential failures in your listening setup. It checks for:
+- **Work Scrobbler Failure:** Zero listens during work hours (Mon-Fri, 09:00-17:00).
+- **Weekend Scrobbler Failure:** Zero listens during weekends.
+- **General Failure:** Zero listens during off-hours.
+
+```bash
+$ last-fm-tools check-sources --user=foo --days=14
+```
+
+Options:
+- `--days`: Number of days to check back (default: 14).
+- `--history`: Simulate the check for the past N days to see if alerts would have triggered.
+
 ## email
 
 Sends an email report to the specified address. Supports multiple analysis types.
@@ -61,7 +76,7 @@ Sends an email report to the specified address. Supports multiple analysis types
 $ last-fm-tools email user@example.com top-artists top-albums 2023-01
 ```
 
-Analysis types: `top-artists`, `top-albums`, `new-artists`, `new-albums`, `forgotten`, `top-n`, `taste-report`.
+Analysis types: `top-artists`, `top-albums`, `new-artists`, `new-albums`, `forgotten`, `top-n`, `taste-report`, `check-sources`.
 
 You can pass parameters to specific reports using the `--params` flag. Parameters are matched to reports by their order:
 ```bash
@@ -79,6 +94,17 @@ Adds a report configuration to the database to be sent periodically via `send-re
 ```bash
 $ last-fm-tools add-report --name="Monthly Summary" --dest=user@example.com --run_day=1 top-n taste-report --params "artists=20"
 ```
+
+To add a daily report (e.g., for `check-sources`), use `--run_day=0`. You can configure timezones and cool-off periods using `--params`.
+
+```bash
+$ last-fm-tools add-report check-sources --name="Daily Check" --dest=user@example.com --run_day=0 --params "days=14,timezone=America/Los_Angeles,cool_off_days=1"
+```
+
+Parameters for `check-sources`:
+- `days`: Lookback window size.
+- `timezone`: Timezone for determining work hours (e.g., "America/Los_Angeles").
+- `cool_off_days`: Minimum days to wait before sending another alert (default: 1).
 
 ## list-reports
 
