@@ -1,0 +1,38 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    name: Build and test
+    runs-on: ubuntu-latest
+    env:
+      USE_BAZEL_VERSION: '7.1.0'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Mount bazel cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/bazel
+            ~/.cache/bazelisk
+          key: bazel-${{ runner.os }}-${{ hashFiles('**/BUILD', 'WORKSPACE', 'go.mod', 'go.sum') }}
+          restore-keys: |
+            bazel-${{ runner.os }}-
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Bazelisk
+        run: npm install -g @bazel/bazelisk
+
+      - name: Build
+        run: bazel build //...
+
+      - name: Test
+        run: bazel test //... --test_output=errors
