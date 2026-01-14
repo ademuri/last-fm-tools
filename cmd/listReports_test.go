@@ -23,7 +23,7 @@ func TestListReports(t *testing.T) {
 	db, dbPath := createTestDb(t)
 
 	user := "testuser"
-	err := addReport(dbPath, "report1", user, "user@example.com", 1, []string{"top-albums"}, nil)
+	err := addReport(dbPath, "report1", user, "user@example.com", 1, 0, "", []string{"top-albums"}, nil)
 	if err != nil {
 		t.Fatalf("addReport() error: %w", err)
 	}

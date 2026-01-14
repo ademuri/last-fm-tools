@@ -60,6 +60,8 @@ CREATE TABLE Report (
   run_day INTEGER,
   types TEXT,
   params TEXT,
+  next_run DATETIME,
+  interval_days INTEGER,
   FOREIGN KEY (user) REFERENCES User(name),
   CONSTRAINT PK_Report PRIMARY KEY (name, user, email)
 );

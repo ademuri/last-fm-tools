@@ -64,6 +64,30 @@ func ensureSchema(db *sql.DB) error {
 		}
 	}
 
+	// Report.next_run
+	exists, err = columnExists(db, "Report", "next_run")
+	if err != nil {
+		return fmt.Errorf("checking if Report.next_run exists: %w", err)
+	}
+	if !exists {
+		_, err := db.Exec("ALTER TABLE Report ADD COLUMN next_run DATETIME")
+		if err != nil {
+			return fmt.Errorf("adding next_run to Report: %w", err)
+		}
+	}
+
+	// Report.interval_days
+	exists, err = columnExists(db, "Report", "interval_days")
+	if err != nil {
+		return fmt.Errorf("checking if Report.interval_days exists: %w", err)
+	}
+	if !exists {
+		_, err := db.Exec("ALTER TABLE Report ADD COLUMN interval_days INTEGER")
+		if err != nil {
+			return fmt.Errorf("adding interval_days to Report: %w", err)
+		}
+	}
+
 	return nil
 }
 

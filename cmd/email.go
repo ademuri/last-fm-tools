@@ -39,6 +39,7 @@ type SendEmailConfig struct {
 	SMTPPassword string
 	Start        time.Time
 	End          time.Time
+	NextRun      time.Time
 }
 
 var emailCmd = &cobra.Command{
@@ -208,7 +209,13 @@ func sendEmail(config SendEmailConfig) error {
 				return fmt.Errorf("Recording last run: %w", err)
 			}
 			now := time.Now()
-			_, err = db.Exec("UPDATE Report SET sent = ? WHERE user = ? AND name = ? AND email = ?", now, config.User, config.ReportName, config.To)
+			
+			if !config.NextRun.IsZero() {
+				_, err = db.Exec("UPDATE Report SET sent = ?, next_run = ? WHERE user = ? AND name = ? AND email = ?", now, config.NextRun, config.User, config.ReportName, config.To)
+			} else {
+				_, err = db.Exec("UPDATE Report SET sent = ? WHERE user = ? AND name = ? AND email = ?", now, config.User, config.ReportName, config.To)
+			}
+			
 			if err != nil {
 				return fmt.Errorf("Recording last run: %w", err)
 			}

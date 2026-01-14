@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -45,7 +46,7 @@ var addReportCmd = &cobra.Command{
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 		params, _ := cmd.Flags().GetStringArray("params")
-		
+
 		if len(params) > 0 && len(params) != len(args) {
 			fmt.Printf("Error: Number of --params flags (%d) must match number of reports (%d), or be 0.\n", len(params), len(args))
 			os.Exit(1)
@@ -54,8 +55,10 @@ var addReportCmd = &cobra.Command{
 		dest, _ := cmd.Flags().GetString("dest")
 		name, _ := cmd.Flags().GetString("name")
 		runDay, _ := cmd.Flags().GetInt("run_day")
+		interval, _ := cmd.Flags().GetInt("interval")
+		firstRun, _ := cmd.Flags().GetString("first_run")
 
-		err := addReport(viper.GetString("database"), name, viper.GetString("user"), dest, runDay, args, params)
+		err := addReport(viper.GetString("database"), name, viper.GetString("user"), dest, runDay, interval, firstRun, args, params)
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)
@@ -69,12 +72,25 @@ func init() {
 	addReportCmd.Flags().String("dest", "", "Destination email address")
 	addReportCmd.Flags().String("name", "", "Report name - included in the email title, and used for periodically sending")
 	addReportCmd.Flags().Int("run_day", 0, "Which day of the month to run this report on")
+	addReportCmd.Flags().Int("interval", 0, "Interval in days between reports")
+	addReportCmd.Flags().String("first_run", "", "Date of the first run (YYYY-MM-DD)")
 	addReportCmd.Flags().StringArray("params", nil, "Parameters for reports, matched by index (e.g. --params 'n=20')")
 }
 
-func addReport(dbPath string, name string, user string, to string, runDay int, types []string, params []string) error {
+func addReport(dbPath string, name string, user string, to string, runDay int, interval int, firstRun string, types []string, params []string) error {
 	if runDay < 0 || runDay > 31 {
 		return fmt.Errorf("run_day out of range: %d", runDay)
+	}
+
+	var nextRunTime time.Time
+	if firstRun != "" {
+		var err error
+		nextRunTime, err = time.Parse("2006-01-02", firstRun)
+		if err != nil {
+			return fmt.Errorf("invalid first_run date: %w", err)
+		}
+	} else if interval > 0 {
+		nextRunTime = time.Now()
 	}
 
 	for _, actionName := range types {
@@ -96,7 +112,7 @@ func addReport(dbPath string, name string, user string, to string, runDay int, t
 	if err != nil {
 		return nil
 	}
-	
+
 	// Convert params slice to JSON list of maps
 	structuredParams := make([]map[string]string, len(types))
 	for i := range types {
@@ -118,7 +134,12 @@ func addReport(dbPath string, name string, user string, to string, runDay int, t
 		return fmt.Errorf("marshalling params: %w", err)
 	}
 
-	_, err = db.Exec("INSERT INTO Report(user, name, email, run_day, types, params) VALUES (?, ?, ?, ?, ?, ?)", user, name, to, runDay, strings.Join(types, ","), string(paramsJSON))
+	var nextRun interface{}
+	if !nextRunTime.IsZero() {
+		nextRun = nextRunTime
+	}
+
+	_, err = db.Exec("INSERT INTO Report(user, name, email, run_day, types, params, interval_days, next_run) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", user, name, to, runDay, strings.Join(types, ","), string(paramsJSON), interval, nextRun)
 	if err != nil {
 		return err
 	}

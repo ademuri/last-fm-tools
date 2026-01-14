@@ -25,7 +25,7 @@ func TestDeleteReport(t *testing.T) {
 	user := "testuser"
 	reportName := "reportToDelete"
 	email := "user@example.com"
-	err := addReport(dbPath, reportName, user, email, 1, []string{"top-albums"}, nil)
+	err := addReport(dbPath, reportName, user, email, 1, 0, "", []string{"top-albums"}, nil)
 	if err != nil {
 		t.Fatalf("addReport() error: %w", err)
 	}
@@ -64,11 +64,11 @@ func TestDeleteReportWithDuplicateName(t *testing.T) {
 	email1 := "user1@example.com"
 	email2 := "user2@example.com"
 
-	err := addReport(dbPath, reportName, user, email1, 1, []string{"top-albums"}, nil)
+	err := addReport(dbPath, reportName, user, email1, 1, 0, "", []string{"top-albums"}, nil)
 	if err != nil {
 		t.Fatalf("addReport() 1 error: %w", err)
 	}
-	err = addReport(dbPath, reportName, user, email2, 1, []string{"top-artists"}, nil)
+	err = addReport(dbPath, reportName, user, email2, 1, 0, "", []string{"top-artists"}, nil)
 	if err != nil {
 		t.Fatalf("addReport() 2 error: %w", err)
 	}
