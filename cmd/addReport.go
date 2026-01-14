@@ -31,6 +31,18 @@ var addReportCmd = &cobra.Command{
 	Short: "Adds an email report, to be sent periodically with `send-reports`",
 	Long:  ``,
 	Args:  cobra.MinimumNArgs(1),
+	PreRunE: func(cmd *cobra.Command, args []string) error {
+		dest, _ := cmd.Flags().GetString("dest")
+		if dest == "" {
+			return fmt.Errorf("required flag(s) \"dest\" not set")
+		}
+
+		name, _ := cmd.Flags().GetString("name")
+		if name == "" {
+			return fmt.Errorf("required flag(s) \"name\" not set")
+		}
+		return nil
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		params, _ := cmd.Flags().GetStringArray("params")
 		
@@ -39,19 +51,9 @@ var addReportCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		dest := viper.GetString("dest")
-		if dest == "" {
-			fmt.Println("Error: required flag(s) \"dest\" not set")
-			os.Exit(1)
-		}
-
-		name := viper.GetString("name")
-		if name == "" {
-			fmt.Println("Error: required flag(s) \"name\" not set")
-			os.Exit(1)
-		}
-
-		runDay := viper.GetInt("run_day")
+		dest, _ := cmd.Flags().GetString("dest")
+		name, _ := cmd.Flags().GetString("name")
+		runDay, _ := cmd.Flags().GetInt("run_day")
 
 		err := addReport(viper.GetString("database"), name, viper.GetString("user"), dest, runDay, args, params)
 		if err != nil {
@@ -64,21 +66,9 @@ var addReportCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(addReportCmd)
 
-	var email string
-	addReportCmd.Flags().StringVar(&email, "dest", "", "Destination email address")
-	err := viper.BindPFlag("dest", addReportCmd.Flags().Lookup("dest"))
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	var reportName string
-	addReportCmd.Flags().StringVar(&reportName, "name", "", "Report name - included in the email title, and used for periodically sending")
-	viper.BindPFlag("name", addReportCmd.Flags().Lookup("name"))
-
-	var runDay int
-	addReportCmd.Flags().IntVar(&runDay, "run_day", 0, "Which day of the month to run this report on")
-	viper.BindPFlag("run_day", addReportCmd.Flags().Lookup("run_day"))
-	
+	addReportCmd.Flags().String("dest", "", "Destination email address")
+	addReportCmd.Flags().String("name", "", "Report name - included in the email title, and used for periodically sending")
+	addReportCmd.Flags().Int("run_day", 0, "Which day of the month to run this report on")
 	addReportCmd.Flags().StringArray("params", nil, "Parameters for reports, matched by index (e.g. --params 'n=20')")
 }
 

@@ -39,15 +39,6 @@ var rootCmd = &cobra.Command{
 	Use:   "last-fm-tools",
 	Short: "Performs analysis on last.fm listening data",
 	Long:  `Someday, this will do things.`,
-	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		required := []string{"api_key", "secret", "from"}
-		for _, req := range required {
-			if viper.GetString(req) == "" {
-				return fmt.Errorf("required flag(s) \"%s\" not set", req)
-			}
-		}
-		return nil
-	},
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.

@@ -49,6 +49,12 @@ var emailCmd = &cobra.Command{
   Optional date arguments can be provided at the end (e.g. '2023-01' or '2023-01 2023-06').
   If no dates are provided, defaults to the previous month.`,
 	Args: cobra.MinimumNArgs(2),
+	PreRunE: func(cmd *cobra.Command, args []string) error {
+		if viper.GetString("from") == "" {
+			return fmt.Errorf("required flag(s) \"from\" not set")
+		}
+		return nil
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		to := args[0]
 		rest := args[1:]

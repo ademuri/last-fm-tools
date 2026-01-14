@@ -45,6 +45,15 @@ var updateCmd = &cobra.Command{
 	Use:   "update",
 	Short: "Fetches data from last.fm",
 	Long:  `Stores data in a local SQLite database.`,
+	PreRunE: func(cmd *cobra.Command, args []string) error {
+		required := []string{"api_key", "secret"}
+		for _, req := range required {
+			if viper.GetString(req) == "" {
+				return fmt.Errorf("required flag(s) \"%s\" not set", req)
+			}
+		}
+		return nil
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		intervalStr := viper.GetString("tag-update-interval")
 		interval, err := time.ParseDuration(intervalStr)

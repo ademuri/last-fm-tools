@@ -42,6 +42,15 @@ var sendReportsCmd = &cobra.Command{
 	Use:   "send-reports",
 	Short: "Update the database and send email reports.",
 	Long:  ``,
+	PreRunE: func(cmd *cobra.Command, args []string) error {
+		required := []string{"api_key", "secret", "from"}
+		for _, req := range required {
+			if viper.GetString(req) == "" {
+				return fmt.Errorf("required flag(s) \"%s\" not set", req)
+			}
+		}
+		return nil
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		dryRun, _ := cmd.Flags().GetBool("dry_run")
 		force, _ := cmd.Flags().GetBool("force")
