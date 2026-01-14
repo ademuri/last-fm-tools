@@ -19,7 +19,11 @@ export GOCACHE="$CACHE_BASE/go-cache"
 export PATH="$CACHE_BASE/bin:$PATH"
 
 ARGS=("$@")
-if [[ "$VERB" != "run" && ${#ARGS[@]} -eq 0 ]]; then
+if [[ "$VERB" == "run" ]]; then
+  if [[ ${#ARGS[@]} -eq 0 || ( "${ARGS[0]}" != //* && "${ARGS[0]}" != @* && "${ARGS[0]}" != :* ) ]]; then
+     ARGS=("//:last-fm-tools" "${ARGS[@]}")
+  fi
+elif [[ ${#ARGS[@]} -eq 0 ]]; then
   ARGS=("//...")
 fi
 
