@@ -19,6 +19,7 @@ package cmd
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestAddReport(t *testing.T) {
@@ -41,5 +42,44 @@ func TestAddReportInvalidAction(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), invalidAction) {
 		t.Fatalf("Should have error with invalid action (%q): %w", invalidAction, err)
+	}
+}
+
+func TestAddReportRelativeFirstRun(t *testing.T) {
+	db, dbPath := createTestDb(t)
+
+	// Test 30d
+	err := addReport(dbPath, "relative report", "testuser", "testuser@gmail.com", 1, 0, "30d", []string{"top-albums"}, nil)
+	if err != nil {
+		t.Fatalf("addReport() error: %w", err)
+	}
+
+	var nextRun time.Time
+	err = db.QueryRow("SELECT next_run FROM Report WHERE name = ?", "relative report").Scan(&nextRun)
+	if err != nil {
+		t.Fatalf("QueryRow failed: %v", err)
+	}
+
+	expected := time.Now().AddDate(0, 0, 30)
+	// Allow 5 minutes difference
+	if nextRun.Sub(expected) > 5*time.Minute || nextRun.Sub(expected) < -5*time.Minute {
+		t.Errorf("Expected next_run around %v, got %v", expected, nextRun)
+	}
+
+	// Test absolute date (regression)
+	absoluteDate := "2025-01-01"
+	err = addReport(dbPath, "absolute report", "testuser", "testuser@gmail.com", 1, 0, absoluteDate, []string{"top-albums"}, nil)
+	if err != nil {
+		t.Fatalf("addReport() error: %w", err)
+	}
+
+	err = db.QueryRow("SELECT next_run FROM Report WHERE name = ?", "absolute report").Scan(&nextRun)
+	if err != nil {
+		t.Fatalf("QueryRow failed: %v", err)
+	}
+
+	expectedAbs, _ := time.Parse("2006-01-02", absoluteDate)
+	if !nextRun.Equal(expectedAbs) {
+		t.Errorf("Expected next_run %v, got %v", expectedAbs, nextRun)
 	}
 }

@@ -19,6 +19,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -84,10 +86,34 @@ func addReport(dbPath string, name string, user string, to string, runDay int, i
 
 	var nextRunTime time.Time
 	if firstRun != "" {
-		var err error
-		nextRunTime, err = time.Parse("2006-01-02", firstRun)
-		if err != nil {
-			return fmt.Errorf("invalid first_run date: %w", err)
+		// Check for relative date first
+		reRelative := regexp.MustCompile(`^(\d+)([dwmy])$`)
+		matches := reRelative.FindStringSubmatch(firstRun)
+		if len(matches) == 3 {
+			amount, err := strconv.Atoi(matches[1])
+			if err != nil {
+				return fmt.Errorf("parsing relative amount: %w", err)
+			}
+
+			unit := matches[2]
+			now := time.Now()
+
+			switch unit {
+			case "d":
+				nextRunTime = now.AddDate(0, 0, amount)
+			case "w":
+				nextRunTime = now.AddDate(0, 0, amount*7)
+			case "m":
+				nextRunTime = now.AddDate(0, amount, 0)
+			case "y":
+				nextRunTime = now.AddDate(amount, 0, 0)
+			}
+		} else {
+			var err error
+			nextRunTime, err = time.Parse("2006-01-02", firstRun)
+			if err != nil {
+				return fmt.Errorf("invalid first_run date: %w", err)
+			}
 		}
 	} else if interval > 0 {
 		nextRunTime = time.Now()
