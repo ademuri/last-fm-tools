@@ -47,6 +47,7 @@ go_test(
     srcs = [
         "addReport_test.go",
         "checkSources_test.go",
+        "commands_test.go",
         "date_test.go",
         "deleteReport_test.go",
         "email_test.go",
