@@ -104,13 +104,25 @@ $ last-fm-tools email user@example.com top-n top-artists forgotten --params "art
 Adds a report configuration to the database to be sent periodically via `send-reports`.
 
 ```bash
+# Monthly report on the 1st of every month
 $ last-fm-tools add-report --name="Monthly Summary" --dest=user@example.com --run_day=1 top-n taste-report --params "artists=20"
+
+# Weekly report starting from a specific date
+$ last-fm-tools add-report --name="Weekly Recap" --dest=user@example.com --interval=7 --first_run=2026-01-19 top-artists top-albums
 ```
 
-To add a daily report (e.g., for `check-sources`), use `--run_day=0`. You can configure timezones and cool-off periods using `--params`.
+Options:
+- `--name`: Report name (required).
+- `--dest`: Destination email address (required).
+- `--run_day`: Which day of the month to run (1-31). Use `0` for non-monthly reports (default).
+- `--interval`: Interval in days between reports.
+- `--first_run`: Date of the first run (YYYY-MM-DD). If omitted and `--interval` is set, defaults to today.
+- `--params`: Parameters for specific report types.
+
+To add a daily report (e.g., for `check-sources`), use `--run_day=0` (or leave it as default) and either no interval (defaults to daily behavior) or `--interval=1`.
 
 ```bash
-$ last-fm-tools add-report check-sources --name="Daily Check" --dest=user@example.com --run_day=0 --params "days=14,timezone=America/Los_Angeles,cool_off_days=1,work_hours=09-17"
+$ last-fm-tools add-report check-sources --name="Daily Check" --dest=user@example.com --params "days=14,timezone=America/Los_Angeles,cool_off_days=1,work_hours=09-17"
 ```
 
 ## list-reports
@@ -123,7 +135,7 @@ $ last-fm-tools list-reports
 
 ## send-reports
 
-Checks the database for reports that need to be sent (based on `run_day`) and emails them. It also updates the database with the latest scrobbles before sending.
+Checks the database for reports that need to be sent (based on `run_day` or `interval`/`next_run`) and emails them. It also updates the database with the latest scrobbles before sending.
 
 ```bash
 $ last-fm-tools send-reports
