@@ -24,6 +24,8 @@ $ bash gemini-build.sh build
 $ bash gemini-build.sh test
 ```
 
+After building, the binary is located at `bazel-bin/last-fm-tools_/last-fm-tools`.
+
 ## General Instructions
 
 Prefer to create (Git) commits for small units of work, e.g. a single bugfix.
