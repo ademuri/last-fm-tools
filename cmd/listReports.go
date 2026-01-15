@@ -52,9 +52,9 @@ func listReports(dbPath string, user string) error {
 
 	var rows *sql.Rows
 	if user != "" {
-		rows, err = db.Query("SELECT user, name, email, run_day, types, params FROM Report WHERE user = ?", user)
+		rows, err = db.Query("SELECT user, name, email, run_day, types, params, sent, next_run FROM Report WHERE user = ?", user)
 	} else {
-		rows, err = db.Query("SELECT user, name, email, run_day, types, params FROM Report")
+		rows, err = db.Query("SELECT user, name, email, run_day, types, params, sent, next_run FROM Report")
 	}
 	if err != nil {
 		return fmt.Errorf("query reports: %w", err)
@@ -62,7 +62,7 @@ func listReports(dbPath string, user string) error {
 	defer rows.Close()
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "USER\tNAME\tEMAIL\tRUN DAY\tTYPES\tPARAMS")
+	fmt.Fprintln(w, "USER\tNAME\tEMAIL\tRUN DAY\tTYPES\tPARAMS\tLAST SENT\tNEXT RUN")
 
 	for rows.Next() {
 		var u string
@@ -71,14 +71,24 @@ func listReports(dbPath string, user string) error {
 		var runDay int
 		var types string
 		var params sql.NullString
-		if err := rows.Scan(&u, &name, &email, &runDay, &types, &params); err != nil {
+		var sent sql.NullTime
+		var nextRun sql.NullTime
+		if err := rows.Scan(&u, &name, &email, &runDay, &types, &params, &sent, &nextRun); err != nil {
 			return fmt.Errorf("scan report: %w", err)
 		}
 		pStr := ""
 		if params.Valid {
 			pStr = params.String
 		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%d\t%s\t%s\n", u, name, email, runDay, types, pStr)
+		sentStr := "-"
+		if sent.Valid {
+			sentStr = sent.Time.Format("2006-01-02 15:04")
+		}
+		nextRunStr := "-"
+		if nextRun.Valid {
+			nextRunStr = nextRun.Time.Format("2006-01-02 15:04")
+		}
+		fmt.Fprintf(w, "%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\n", u, name, email, runDay, types, pStr, sentStr, nextRunStr)
 	}
 
 	if err := rows.Err(); err != nil {
