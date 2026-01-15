@@ -23,15 +23,16 @@ func TestCheckSourcesAnalyzer_GetResults(t *testing.T) {
 	s.Close() // Close so we can re-open in GetResults or AddRecentTracks
 
 	user := "testuser"
+	// Use a fixed time for hermetic tests. 2024-06-03 is a Monday.
+	testNow := time.Date(2024, 6, 3, 12, 0, 0, 0, time.Local)
 
 	t.Run("All Good", func(t *testing.T) {
 		dbRaw, dbPath := createTestDb(t)
 		defer dbRaw.Close()
 		
 		// Populate with recent data
-		now := time.Now()
 		for i := 0; i < 10; i++ {
-			d := now.AddDate(0, 0, -i)
+			d := testNow.AddDate(0, 0, -i)
 			addListenForDB(t, dbPath, user, time.Date(d.Year(), d.Month(), d.Day(), 12, 0, 0, 0, time.Local))
 			addListenForDB(t, dbPath, user, time.Date(d.Year(), d.Month(), d.Day(), 20, 0, 0, 0, time.Local))
 		}
@@ -39,7 +40,7 @@ func TestCheckSourcesAnalyzer_GetResults(t *testing.T) {
 		analyzer := &CheckSourcesAnalyzer{}
 		analyzer.Configure(map[string]string{"days": "14"}) // Set defaults + days
 		
-		_, err := analyzer.GetResults(dbPath, user, time.Time{}, time.Time{})
+		_, err := analyzer.GetResults(dbPath, user, time.Time{}, testNow)
 		if err != ErrSkipReport {
 			t.Errorf("Expected ErrSkipReport, got %v", err)
 		}
@@ -49,16 +50,15 @@ func TestCheckSourcesAnalyzer_GetResults(t *testing.T) {
 		dbRaw, dbPath := createTestDb(t)
 		defer dbRaw.Close()
 
-		now := time.Now()
 		for i := 0; i < 10; i++ {
-			d := now.AddDate(0, 0, -i)
+			d := testNow.AddDate(0, 0, -i)
 			addListenForDB(t, dbPath, user, time.Date(d.Year(), d.Month(), d.Day(), 20, 0, 0, 0, time.Local))
 		}
 
 		analyzer := &CheckSourcesAnalyzer{}
 		analyzer.Configure(map[string]string{"days": "14"})
 
-		res, err := analyzer.GetResults(dbPath, user, time.Time{}, time.Time{})
+		res, err := analyzer.GetResults(dbPath, user, time.Time{}, testNow)
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
@@ -72,9 +72,8 @@ func TestCheckSourcesAnalyzer_GetResults(t *testing.T) {
 		dbRaw, dbPath := createTestDb(t)
 		defer dbRaw.Close()
 
-		now := time.Now()
 		for i := 0; i < 20; i++ {
-			d := now.AddDate(0, 0, -i)
+			d := testNow.AddDate(0, 0, -i)
 			if d.Weekday() == time.Saturday || d.Weekday() == time.Sunday {
 				continue // Skip weekend
 			}
@@ -84,7 +83,7 @@ func TestCheckSourcesAnalyzer_GetResults(t *testing.T) {
 		analyzer := &CheckSourcesAnalyzer{}
 		analyzer.Configure(map[string]string{"days": "20"})
 
-		res, err := analyzer.GetResults(dbPath, user, time.Time{}, time.Time{})
+		res, err := analyzer.GetResults(dbPath, user, time.Time{}, testNow)
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
@@ -98,11 +97,10 @@ func TestCheckSourcesAnalyzer_GetResults(t *testing.T) {
 		dbRaw, dbPath := createTestDb(t)
 		defer dbRaw.Close()
 
-		now := time.Now()
 		// Create a scenario: 5 days of silence during Work Hours
 		// Add listens for 10 days, but SKIP work hours for the last 5 days
 		for i := 0; i < 10; i++ {
-			d := now.AddDate(0, 0, -i)
+			d := testNow.AddDate(0, 0, -i)
 			// Always add Other Hours
 			addListenForDB(t, dbPath, user, time.Date(d.Year(), d.Month(), d.Day(), 20, 0, 0, 0, time.Local))
 			
@@ -111,21 +109,11 @@ func TestCheckSourcesAnalyzer_GetResults(t *testing.T) {
 				addListenForDB(t, dbPath, user, time.Date(d.Year(), d.Month(), d.Day(), 12, 0, 0, 0, time.Local))
 			}
 		}
-		// Result: Streak should be 5 working days (assuming M-F).
-		// Wait, if today is Wed, last 5 days are Wed, Tue, Mon, Sun, Sat.
-		// Sun/Sat skipped.
-		// Streak = Wed, Tue, Mon. Streak = 3.
-		// Need to ensure enough working days are silent.
-		// Let's create silence for the last 10 days to be safe (streak will be ~7-8 working days).
-		
-		// Re-do: Silence for last 10 days
-		// Actually, let's just reuse the "Work Failure" setup which had 10 days silence.
-		// Streak will be ~8 days.
 		
 		// Test A: Default Threshold (3). Should Alert.
 		analyzerDefault := &CheckSourcesAnalyzer{}
 		analyzerDefault.Configure(map[string]string{"days": "14"})
-		res, err := analyzerDefault.GetResults(dbPath, user, time.Time{}, time.Time{})
+		res, err := analyzerDefault.GetResults(dbPath, user, time.Time{}, testNow)
 		if err != nil {
 			t.Errorf("Default: Unexpected error: %v", err)
 		}
@@ -136,7 +124,7 @@ func TestCheckSourcesAnalyzer_GetResults(t *testing.T) {
 		// Test B: High Threshold (10). Streak (8) < 10. Should NOT Alert.
 		analyzerHigh := &CheckSourcesAnalyzer{}
 		analyzerHigh.Configure(map[string]string{"days": "14", "work_streak": "10"})
-		_, err = analyzerHigh.GetResults(dbPath, user, time.Time{}, time.Time{})
+		_, err = analyzerHigh.GetResults(dbPath, user, time.Time{}, testNow)
 		if err != ErrSkipReport {
 			t.Errorf("High Threshold: Expected ErrSkipReport, got %v", err)
 		}
@@ -151,7 +139,7 @@ func TestCheckSourcesAnalyzer_GetResults(t *testing.T) {
 			defer dbRaw.Close()
 			
 			for i := 0; i < 10; i++ {
-				d := time.Now().AddDate(0, 0, -i)
+				d := testNow.AddDate(0, 0, -i)
 				// Listen at 09:30.
 				// If default (9-17), this is WORK. Streak = 0. No Alert.
 				// If custom (10-18), this is OTHER. Work Streak = 10. Alert.
@@ -161,7 +149,7 @@ func TestCheckSourcesAnalyzer_GetResults(t *testing.T) {
 			analyzer := &CheckSourcesAnalyzer{}
 			analyzer.Configure(map[string]string{"days": "14", "work_hours": "10-18"})
 			
-			res, err := analyzer.GetResults(dbPath, user, time.Time{}, time.Time{})
+			res, err := analyzer.GetResults(dbPath, user, time.Time{}, testNow)
 			if err != nil {
 				t.Errorf("Unexpected error: %v", err)
 			}
@@ -176,14 +164,14 @@ func TestCheckSourcesAnalyzer_GetResults(t *testing.T) {
 			defer dbRaw.Close()
 			
 			for i := 0; i < 10; i++ {
-				d := time.Now().AddDate(0, 0, -i)
+				d := testNow.AddDate(0, 0, -i)
 				addListenForDB(t, dbPath, user, time.Date(d.Year(), d.Month(), d.Day(), 10, 30, 0, 0, time.Local))
 			}
 
 			analyzer := &CheckSourcesAnalyzer{}
 			analyzer.Configure(map[string]string{"days": "14", "work_hours": "10-18"})
 			
-			_, err := analyzer.GetResults(dbPath, user, time.Time{}, time.Time{})
+			_, err := analyzer.GetResults(dbPath, user, time.Time{}, testNow)
 			if err != ErrSkipReport {
 				t.Errorf("Expected ErrSkipReport, got %v", err)
 			}
