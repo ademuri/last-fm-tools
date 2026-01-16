@@ -51,6 +51,7 @@ go_test(
         "date_test.go",
         "deleteReport_test.go",
         "email_test.go",
+        "flag_enforcement_test.go",
         "legacy_test_helpers_test.go",
         "listReports_test.go",
         "newAlbums_test.go",

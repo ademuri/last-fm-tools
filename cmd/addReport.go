@@ -35,6 +35,10 @@ var addReportCmd = &cobra.Command{
 	Long:  ``,
 	Args:  cobra.MinimumNArgs(1),
 	PreRunE: func(cmd *cobra.Command, args []string) error {
+		if viper.GetString("user") == "" {
+			return fmt.Errorf("required flag(s) \"user\" not set")
+		}
+
 		dest, _ := cmd.Flags().GetString("dest")
 		if dest == "" {
 			return fmt.Errorf("required flag(s) \"dest\" not set")

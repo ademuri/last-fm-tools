@@ -28,6 +28,12 @@ var deleteReportCmd = &cobra.Command{
 	Use:   "delete-report",
 	Short: "Deletes a report configured for the user",
 	Long:  ``,
+	PreRunE: func(cmd *cobra.Command, args []string) error {
+		if viper.GetString("user") == "" {
+			return fmt.Errorf("required flag(s) \"user\" not set")
+		}
+		return nil
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		err := deleteReport(viper.GetString("database"), viper.GetString("user"), viper.GetString("name"), viper.GetString("dest"))
 		if err != nil {
