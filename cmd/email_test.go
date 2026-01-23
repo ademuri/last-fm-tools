@@ -155,21 +155,15 @@ func TestGenerateEmailContentNoData(t *testing.T) {
 	}
 
 	subject, body, err := generateEmailContent(config, actions)
-	if err != nil {
-		t.Fatalf("generateEmailContent failed: %v", err)
+	if err != ErrNoDataToReport {
+		t.Fatalf("Expected ErrNoDataToReport, got: %v", err)
 	}
 
-	// Verify Subject (no suffix)
-	expectedSubject := fmt.Sprintf("Listening report for %s %s to %s", user, start.Format("2006-01-02"), end.Format("2006-01-02"))
-	if subject != expectedSubject {
-		t.Errorf("Subject mismatch.\nGot: %s\nWant: %s", subject, expectedSubject)
+	if subject != "" {
+		t.Errorf("Expected empty subject, got: %s", subject)
 	}
 
-	// Verify Body
-	if !strings.Contains(body, "No listens found") {
-		t.Error("Body missing 'No listens found' message")
-	}
-	if strings.Contains(body, "<table>") {
-		t.Error("Body should not contain a table")
+	if body != "" {
+		t.Errorf("Expected empty body, got: %s", body)
 	}
 }

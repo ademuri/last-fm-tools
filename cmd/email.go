@@ -21,10 +21,13 @@ import (
 	"os"
 	"strings"
 	"time"
+    "errors"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
+
+var ErrNoDataToReport = errors.New("no data to report")
 
 type SendEmailConfig struct {
 	DbPath       string
@@ -178,32 +181,41 @@ func sendEmail(config SendEmailConfig) error {
 		actions = append(actions, action)
 	}
 	subject, out, err := generateEmailContent(config, actions)
-	if err != nil {
+	
+	shouldSend := true
+	if err == ErrNoDataToReport {
+		fmt.Printf("No data to report for %q, skipping email.\n", config.User)
+		shouldSend = false
+		err = nil
+	} else if err != nil {
 		return err
 	}
 
-	if config.DryRun {
-		fmt.Printf("Would have sent email: \nsubject: %s\n%s\n", subject, out)
-	} else {
-		if config.SMTPUsername == "" || config.SMTPPassword == "" {
-			return fmt.Errorf("smtp_username and smtp_password must be set in order to send emails")
+	if shouldSend {
+		if config.DryRun {
+			fmt.Printf("Would have sent email: \nsubject: %s\n%s\n", subject, out)
+		} else {
+			if config.SMTPUsername == "" || config.SMTPPassword == "" {
+				return fmt.Errorf("smtp_username and smtp_password must be set in order to send emails")
+			}
+
+			msg := "From: last-fm-tools <" + config.From + ">\r\n" +
+				"To: " + config.To + "\r\n" +
+				"Subject: " + subject + "\r\n" +
+				"MIME-Version: 1.0\r\n" +
+				"Content-Type: text/html; charset=\"UTF-8\"\r\n" +
+				"\r\n" +
+				out
+
+			auth := smtp.PlainAuth("", config.SMTPUsername, config.SMTPPassword, "smtp.gmail.com")
+			err := smtp.SendMail("smtp.gmail.com:587", auth, config.From, []string{config.To}, []byte(msg))
+			if err != nil {
+				return fmt.Errorf("sendEmail: %w", err)
+			}
 		}
+	}
 
-		msg := "From: last-fm-tools <" + config.From + ">\r\n" +
-			"To: " + config.To + "\r\n" +
-			"Subject: " + subject + "\r\n" +
-			"MIME-Version: 1.0\r\n" +
-			"Content-Type: text/html; charset=\"UTF-8\"\r\n" +
-			"\r\n" +
-			out
-
-		auth := smtp.PlainAuth("", config.SMTPUsername, config.SMTPPassword, "smtp.gmail.com")
-		err := smtp.SendMail("smtp.gmail.com:587", auth, config.From, []string{config.To}, []byte(msg))
-		if err != nil {
-			return fmt.Errorf("sendEmail: %w", err)
-		}
-
-		if len(config.ReportName) > 0 {
+	if !config.DryRun && len(config.ReportName) > 0 {
 			db, err := createDatabase(config.DbPath)
 			if err != nil {
 				return fmt.Errorf("Recording last run: %w", err)
@@ -221,7 +233,6 @@ func sendEmail(config SendEmailConfig) error {
 			}
 			db.Close()
 		}
-	}
 
 	return nil
 }
@@ -242,6 +253,7 @@ table, th, td {
   </head>
   <body>
 `
+	hasContent := false
 	for _, action := range actions {
 		out += `
 		<div>
@@ -257,11 +269,14 @@ table, th, td {
 		            return "", "", fmt.Errorf("getting results for %s: %w", action.GetName(), err)
 		        }
 		
-		        if analysis.BodyOverride != "" {			out += analysis.BodyOverride
+		        if analysis.BodyOverride != "" {
+			out += analysis.BodyOverride
+			hasContent = true
 		} else if len(analysis.results) <= 1 {
 			// No listens found
 			out += "<div>No listens found.</div>\n"
 		} else {
+			hasContent = true
 			out += `
 			<table>
 				<thead>
@@ -288,6 +303,10 @@ table, th, td {
 		}
 		out += fmt.Sprintf(`<div>%s</div>
 		</div>`, analysis.summary)
+	}
+
+	if !hasContent {
+		return "", "", ErrNoDataToReport
 	}
 
 	subjectSuffix := ""
