@@ -50,6 +50,7 @@ go_test(
         "commands_test.go",
         "date_test.go",
         "deleteReport_test.go",
+        "email_reproduction_test.go",
         "email_test.go",
         "flag_enforcement_test.go",
         "legacy_test_helpers_test.go",

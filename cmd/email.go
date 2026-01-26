@@ -262,7 +262,7 @@ table, th, td {
 		        		analysis, err := action.GetResults(config.DbPath, config.User, config.Start, config.End)
 		        		if err == ErrSkipReport {
 		        			fmt.Printf("Skipping report %q (check-sources): no issues detected.\n", config.ReportName)
-		        			return "", "", nil
+		        			continue
 		        		}
 		        		if err != nil {
 		        
