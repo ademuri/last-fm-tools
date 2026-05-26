@@ -51,17 +51,20 @@ type Configurable interface {
 }
 
 func (a Analysis) String() string {
+	if a.BodyOverride != "" {
+		return a.BodyOverride
+	}
 	out := new(bytes.Buffer)
-	table := tablewriter.NewWriter(out)
-	table.Header(a.results[0])
-	for _, row := range a.results[1:] {
-		if err := table.Append(row); err != nil {
-			return fmt.Sprintf("Error rendering table: %v", err)
+	if a.summary != "" {
+		fmt.Fprintf(out, "%s\n", a.summary)
+	}
+	if len(a.results) > 1 {
+		table := tablewriter.NewWriter(out)
+		table.Header(a.results[0])
+		for _, row := range a.results[1:] {
+			table.Append(row)
 		}
+		table.Render()
 	}
-	if err := table.Render(); err != nil {
-		return fmt.Sprintf("Error rendering table: %v", err)
-	}
-	fmt.Fprintf(out, "%s\n", a.summary)
 	return out.String()
 }

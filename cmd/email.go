@@ -265,46 +265,45 @@ table, th, td {
 		        			continue
 		        		}
 		        		if err != nil {
-		        
-		            return "", "", fmt.Errorf("getting results for %s: %w", action.GetName(), err)
-		        }
-		
-		        if analysis.BodyOverride != "" {
-			out += analysis.BodyOverride
-			hasContent = true
-		} else if len(analysis.results) <= 1 {
-			// No listens found
-			out += "<div>No listens found.</div>\n"
-		} else {
-			hasContent = true
-			out += `
-			<table>
-				<thead>
-					<tr>
-`
-			for _, header := range analysis.results[0] {
-				out += fmt.Sprintf("<th>%s</th>", header)
-			}
-			out += `				</tr>
-			</thead>`
+		        		    return "", "", fmt.Errorf("getting results for %s: %w", action.GetName(), err)
+		        		}
 
-			for _, row := range analysis.results[1:] {
-				out += "<tr>\n"
-				for _, column := range row {
-					out += fmt.Sprintf("<td>%s</td>\n", column)
+				if analysis.summary != "" {
+					out += fmt.Sprintf("<div>%s</div>\n", strings.ReplaceAll(analysis.summary, "\n", "<br>\n"))
 				}
-				out += "</tr>\n"
 
-			}
-			out += `
-				</tbody>
-			</table>
-`
-		}
-		out += fmt.Sprintf(`<div>%s</div>
-		</div>`, analysis.summary)
-	}
+		        		if len(analysis.results) <= 1 {
+		        		// No listens found
+		        		out += "<div>No listens found.</div>\n"
+		        		} else {
+		        		hasContent = true
+		        		out += `
+		        		<table>
+		        		<thead>
+		        		<tr>
+		        		`
+		        		for _, header := range analysis.results[0] {
+		        		out += fmt.Sprintf("<th>%s</th>", header)
+		        		}
+		        		out += `				</tr>
+		        		</thead>`
 
+		        		for _, row := range analysis.results[1:] {
+		        		out += "<tr>\n"
+		        		for _, column := range row {
+		        		out += fmt.Sprintf("<td>%s</td>\n", column)
+		        		}
+		        		out += "</tr>\n"
+
+		        		}
+		        		out += `
+		        		</tbody>
+		        		</table>
+		        		`
+		        		}
+		        		out += `
+		        		</div>`
+		        		}
 	if !hasContent {
 		return "", "", ErrNoDataToReport
 	}

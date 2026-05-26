@@ -63,8 +63,8 @@ func TestCheckSourcesAnalyzer_GetResults(t *testing.T) {
 			t.Errorf("Unexpected error: %v", err)
 		}
 		expected := "Potential Work Scrobbler Failure"
-		if !contains(res.BodyOverride, expected) {
-			t.Errorf("Expected report to contain %q, got: %s", expected, res.BodyOverride)
+		if !contains(res.summary, expected) {
+			t.Errorf("Expected report to contain %q, got: %s", expected, res.summary)
 		}
 	})
 
@@ -88,8 +88,8 @@ func TestCheckSourcesAnalyzer_GetResults(t *testing.T) {
 			t.Errorf("Unexpected error: %v", err)
 		}
 		expected := "Potential Weekend Scrobbler Failure"
-		if !contains(res.BodyOverride, expected) {
-			t.Errorf("Expected report to contain %q, got: %s", expected, res.BodyOverride)
+		if !contains(res.summary, expected) {
+			t.Errorf("Expected report to contain %q, got: %s", expected, res.summary)
 		}
 	})
 
@@ -117,7 +117,7 @@ func TestCheckSourcesAnalyzer_GetResults(t *testing.T) {
 		if err != nil {
 			t.Errorf("Default: Unexpected error: %v", err)
 		}
-		if !contains(res.BodyOverride, "Potential Work Scrobbler Failure") {
+		if !contains(res.summary, "Potential Work Scrobbler Failure") {
 			t.Errorf("Default: Expected alert, got none")
 		}
 
@@ -153,7 +153,7 @@ func TestCheckSourcesAnalyzer_GetResults(t *testing.T) {
 			if err != nil {
 				t.Errorf("Unexpected error: %v", err)
 			}
-			if !contains(res.BodyOverride, "Potential Work Scrobbler Failure") {
+			if !contains(res.summary, "Potential Work Scrobbler Failure") {
 				t.Errorf("Expected alert with custom hours, got none")
 			}
 		})

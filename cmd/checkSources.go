@@ -7,7 +7,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"text/tabwriter"
 	"time"
 
 	"github.com/ademuri/last-fm-tools/internal/store"
@@ -81,7 +80,7 @@ func checkSources(dbPath, user string, days int, history int) error {
 			foundIssues = true
 			fmt.Printf("--------------------------------------------------\n")
 			fmt.Printf("Date: %s\n", simulatedDate.Format("2006-01-02"))
-			fmt.Println(res.BodyOverride)
+			fmt.Println(res)
 		}
 		if !foundIssues {
 			fmt.Println("No issues would have been detected in the past.")
@@ -99,7 +98,7 @@ func checkSources(dbPath, user string, days int, history int) error {
 		return err
 	}
 
-	fmt.Println(res.BodyOverride)
+	fmt.Println(res)
 	return nil
 }
 
@@ -299,36 +298,40 @@ func (c *CheckSourcesAnalyzer) GetResults(dbPath string, user string, _ time.Tim
 		return Analysis{}, ErrSkipReport
 	}
 
-	// Generate Output
-	var buf bytes.Buffer
-	fmt.Fprintf(&buf, "Scrobble Check for user: %s (Timezone: %s)\n", user, loc.String())
-	fmt.Fprintf(&buf, "Work Hours: Mon-Fri, %02d:00 - %02d:00\n", c.WorkStartHour, c.WorkEndHour)
-	fmt.Fprintln(&buf)
+	// Generate Summary (Warnings)
+	var summaryBuf bytes.Buffer
+	fmt.Fprintf(&summaryBuf, "Scrobble Check for user: %s (Timezone: %s)\n", user, loc.String())
+	fmt.Fprintf(&summaryBuf, "Work Hours: Mon-Fri, %02d:00 - %02d:00\n", c.WorkStartHour, c.WorkEndHour)
+	fmt.Fprintln(&summaryBuf)
 
 	if workStreak > c.WorkStreakThreshold {
-		fmt.Fprintf(&buf, "⚠️  Potential Work Scrobbler Failure: No listens during work hours for the last %d working days.\n", workStreak)
+		fmt.Fprintf(&summaryBuf, "⚠️  Potential Work Scrobbler Failure: No listens during work hours for the last %d working days.\n", workStreak)
 	}
 	if weekendStreak >= c.WeekendStreakThreshold {
-		fmt.Fprintf(&buf, "⚠️  Potential Weekend Scrobbler Failure: No listens during weekends for the last %d weekend days.\n", weekendStreak)
+		fmt.Fprintf(&summaryBuf, "⚠️  Potential Weekend Scrobbler Failure: No listens during weekends for the last %d weekend days.\n", weekendStreak)
 	}
 	if otherStreak > c.OtherStreakThreshold {
-		fmt.Fprintf(&buf, "⚠️  Potential Mobile/Home Scrobbler Failure: No listens during off-hours for the last %d days.\n", otherStreak)
+		fmt.Fprintf(&summaryBuf, "⚠️  Potential Mobile/Home Scrobbler Failure: No listens during off-hours for the last %d days.\n", otherStreak)
 	}
-	fmt.Fprintln(&buf)
 
-	w := tabwriter.NewWriter(&buf, 0, 0, 3, ' ', 0)
-	fmt.Fprintf(w, "Date\tDay\tWork Hours (%d-%d)\tOther Hours\n", c.WorkStartHour, c.WorkEndHour)
+	// Prepare Results Table
+	results := [][]string{{
+		"Date",
+		"Day",
+		fmt.Sprintf("Work Hours (%d-%d)", c.WorkStartHour, c.WorkEndHour),
+		"Other Hours",
+	}}
+
 	for _, dateStr := range keys {
-		c := counts[dateStr]
-		dayName := c.Date.Weekday().String()[:3]
-		workStr := fmt.Sprintf("%d", c.WorkHours)
-		otherStr := fmt.Sprintf("%d", c.OtherHours)
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", dateStr, dayName, workStr, otherStr)
+		entry := counts[dateStr]
+		dayName := entry.Date.Weekday().String()[:3]
+		workStr := fmt.Sprintf("%d", entry.WorkHours)
+		otherStr := fmt.Sprintf("%d", entry.OtherHours)
+		results = append(results, []string{dateStr, dayName, workStr, otherStr})
 	}
-	w.Flush()
 
 	return Analysis{
-		BodyOverride: buf.String(),
-		summary:      "Scrobbling issues detected",
+		results: results,
+		summary: summaryBuf.String(),
 	}, nil
 }
