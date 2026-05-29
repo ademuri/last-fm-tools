@@ -265,11 +265,15 @@ func (c *CheckSourcesAnalyzer) GetResults(dbPath string, user string, _ time.Tim
 	}
 
 	// Work Streak (skip weekends)
+	lastWorkDay := time.Time{}
 	for i := len(keys) - 1; i >= 0; i-- {
 		entry := counts[keys[i]]
 		isWeekend := entry.Date.Weekday() == time.Saturday || entry.Date.Weekday() == time.Sunday
 		if isWeekend {
 			continue
+		}
+		if lastWorkDay.IsZero() {
+			lastWorkDay = entry.Date
 		}
 		if entry.WorkHours == 0 {
 			workStreak++
@@ -278,12 +282,27 @@ func (c *CheckSourcesAnalyzer) GetResults(dbPath string, user string, _ time.Tim
 		}
 	}
 
+	// Suppression logic for Work failures: Only report if the last work day was today or yesterday.
+	// On Saturday, yesterday was Friday (Work Day). On Sunday, yesterday was Saturday (Non-Work Day).
+	// This means we alert on Saturday but suppress on Sunday.
+	if !lastWorkDay.IsZero() {
+		todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+		yesterdayStart := todayStart.AddDate(0, 0, -1)
+		if lastWorkDay.Before(yesterdayStart) {
+			workStreak = 0 // Suppress
+		}
+	}
+
 	// Weekend Streak (skip weekdays)
+	lastWeekendDay := time.Time{}
 	for i := len(keys) - 1; i >= 0; i-- {
 		entry := counts[keys[i]]
 		isWeekend := entry.Date.Weekday() == time.Saturday || entry.Date.Weekday() == time.Sunday
 		if !isWeekend {
 			continue
+		}
+		if lastWeekendDay.IsZero() {
+			lastWeekendDay = entry.Date
 		}
 		// On weekends, all hours are "OtherHours" (WorkHours is 0 by definition in our loop)
 		// But let's check total listens just to be safe (OtherHours + WorkHours)
@@ -291,6 +310,16 @@ func (c *CheckSourcesAnalyzer) GetResults(dbPath string, user string, _ time.Tim
 			weekendStreak++
 		} else {
 			break
+		}
+	}
+
+	// Suppression logic: Only report weekend failures if the most recent weekend day was today or yesterday.
+	// This avoids nagging notifications during the work week for weekend failures that can't be fixed until the next weekend.
+	if !lastWeekendDay.IsZero() {
+		todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+		yesterdayStart := todayStart.AddDate(0, 0, -1)
+		if lastWeekendDay.Before(yesterdayStart) {
+			weekendStreak = 0 // Suppress
 		}
 	}
 

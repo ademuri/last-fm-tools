@@ -93,6 +93,106 @@ func TestCheckSourcesAnalyzer_GetResults(t *testing.T) {
 		}
 	})
 
+	t.Run("Weekend Failure - Mid-week Suppression", func(t *testing.T) {
+		// 2024-06-05 is a Wednesday.
+		midWeekNow := time.Date(2024, 6, 5, 12, 0, 0, 0, time.Local)
+		dbRaw, dbPath := createTestDb(t)
+		defer dbRaw.Close()
+
+		for i := 0; i < 20; i++ {
+			d := midWeekNow.AddDate(0, 0, -i)
+			if d.Weekday() == time.Saturday || d.Weekday() == time.Sunday {
+				continue // Skip weekend
+			}
+			addListenForDB(t, dbPath, user, time.Date(d.Year(), d.Month(), d.Day(), 12, 0, 0, 0, time.Local))
+			addListenForDB(t, dbPath, user, time.Date(d.Year(), d.Month(), d.Day(), 20, 0, 0, 0, time.Local))
+		}
+
+		analyzer := &CheckSourcesAnalyzer{}
+		analyzer.Configure(map[string]string{"days": "20", "weekend_streak": "2"})
+
+		_, err := analyzer.GetResults(dbPath, user, time.Time{}, midWeekNow)
+		// Currently (without fix), this will NOT be ErrSkipReport because weekendStreak=2 >= threshold.
+		// After fix, it should be ErrSkipReport.
+		if err != ErrSkipReport {
+			t.Errorf("Expected ErrSkipReport on Wednesday, got %v", err)
+		}
+	})
+
+	t.Run("Weekend Failure - Monday Alert", func(t *testing.T) {
+		// 2024-06-03 is a Monday.
+		mondayNow := time.Date(2024, 6, 3, 12, 0, 0, 0, time.Local)
+		dbRaw, dbPath := createTestDb(t)
+		defer dbRaw.Close()
+
+		for i := 0; i < 20; i++ {
+			d := mondayNow.AddDate(0, 0, -i)
+			if d.Weekday() == time.Saturday || d.Weekday() == time.Sunday {
+				continue // Skip weekend
+			}
+			addListenForDB(t, dbPath, user, time.Date(d.Year(), d.Month(), d.Day(), 12, 0, 0, 0, time.Local))
+			addListenForDB(t, dbPath, user, time.Date(d.Year(), d.Month(), d.Day(), 20, 0, 0, 0, time.Local))
+		}
+
+		analyzer := &CheckSourcesAnalyzer{}
+		analyzer.Configure(map[string]string{"days": "20", "weekend_streak": "2"})
+
+		res, err := analyzer.GetResults(dbPath, user, time.Time{}, mondayNow)
+		if err != nil {
+			t.Errorf("Unexpected error on Monday: %v", err)
+		}
+		expected := "Potential Weekend Scrobbler Failure"
+		if !contains(res.summary, expected) {
+			t.Errorf("Expected report to contain %q on Monday, got: %s", expected, res.summary)
+		}
+	})
+
+	t.Run("Work Failure - Sunday Suppression", func(t *testing.T) {
+		// 2024-06-02 is a Sunday.
+		sundayNow := time.Date(2024, 6, 2, 12, 0, 0, 0, time.Local)
+		dbRaw, dbPath := createTestDb(t)
+		defer dbRaw.Close()
+
+		// 5 days of work silence (Mon-Fri)
+		for i := 0; i < 10; i++ {
+			d := sundayNow.AddDate(0, 0, -i)
+			addListenForDB(t, dbPath, user, time.Date(d.Year(), d.Month(), d.Day(), 20, 0, 0, 0, time.Local))
+		}
+
+		analyzer := &CheckSourcesAnalyzer{}
+		analyzer.Configure(map[string]string{"days": "14"})
+
+		_, err := analyzer.GetResults(dbPath, user, time.Time{}, sundayNow)
+		if err != ErrSkipReport {
+			t.Errorf("Expected ErrSkipReport on Sunday for Work Failure, got %v", err)
+		}
+	})
+
+	t.Run("Work Failure - Saturday Alert", func(t *testing.T) {
+		// 2024-06-01 is a Saturday.
+		saturdayNow := time.Date(2024, 6, 1, 12, 0, 0, 0, time.Local)
+		dbRaw, dbPath := createTestDb(t)
+		defer dbRaw.Close()
+
+		// 5 days of work silence (Mon-Fri)
+		for i := 0; i < 10; i++ {
+			d := saturdayNow.AddDate(0, 0, -i)
+			addListenForDB(t, dbPath, user, time.Date(d.Year(), d.Month(), d.Day(), 20, 0, 0, 0, time.Local))
+		}
+
+		analyzer := &CheckSourcesAnalyzer{}
+		analyzer.Configure(map[string]string{"days": "14"})
+
+		res, err := analyzer.GetResults(dbPath, user, time.Time{}, saturdayNow)
+		if err != nil {
+			t.Errorf("Unexpected error on Saturday: %v", err)
+		}
+		expected := "Potential Work Scrobbler Failure"
+		if !contains(res.summary, expected) {
+			t.Errorf("Expected report to contain %q on Saturday, got: %s", expected, res.summary)
+		}
+	})
+
 	t.Run("Sensitivity Configuration", func(t *testing.T) {
 		dbRaw, dbPath := createTestDb(t)
 		defer dbRaw.Close()
